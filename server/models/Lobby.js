@@ -24,10 +24,6 @@ const playerSchema = new mongoose.Schema({
             message: 'Spectators cannot have roles, and players on blue/red teams must have a role'
         }
     },
-    score: {
-        type: Number,
-        default: 0
-    },
     isHost: {
         type: Boolean,
         default: false
@@ -36,6 +32,7 @@ const playerSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
+
 }, { _id: true });
 
 const lobbySchema = new mongoose.Schema({
@@ -48,26 +45,48 @@ const lobbySchema = new mongoose.Schema({
         rounds: {
             type: Number,
             required: true,
-            default: 10,
+            default: 7,
         },
         timeLimit: {
             type: Number,
+            required: true,
             default: 60, // seconds per round
-        },
-        maxPlayers: {
-            type: Number,
-            default: 8,
         }
     },
-    players: [playerSchema],
-    gameState: {
-        type: String,
-        enum: ['waiting', 'playing', 'finished'],
-        default: 'waiting'
+    host: {
+        type: playerSchema,
+        required: true,
     },
-    currentRound: {
-        type: Number,
-        default: 0
+    players: {
+        spectators: [playerSchema],
+        redTeam: [playerSchema],
+        blueTeam: [playerSchema],
+        blueCaptain: {
+            type: playerSchema,
+        },
+        redCaptain: {
+            type: playerSchema,
+        },
+    },
+    gameState: {
+        inGame: {
+            type: Boolean,
+            default: false,
+        },
+        blueScore: {
+            type: Number,
+            default: 0,
+            required: true,
+        },
+        redScore: {
+            type: Number,
+            default: 0,
+            required: true,
+        },
+        currentRound: {
+            type: Number,
+            default: 0
+        },
     },
     createdAt: {
         type: Date,
@@ -96,16 +115,83 @@ lobbySchema.methods.removePlayer = function(playerName) {
     return this.save();
 };
 
-lobbySchema.methods.getPlayerByName = function(name) {
-    return this.players.find(player => player.name === name);
-};
-
 lobbySchema.methods.getPlayersByTeam = function(team) {
-    return this.players.filter(player => player.team === team);
+    switch (team) {
+        case 'blue':
+            return this.players.blueTeam;
+        case 'red':
+            return this.players.redTeam;
+        case 'spectator':
+            return this.player.spectators;
+        default:
+            return [];
+    }
 };
 
-lobbySchema.methods.getHost = function() {
-    return this.players.find(player => player.isHost);
+
+
+lobbySchema.methods.checkIfPlayerIsHost = function(id) {
+    return this.host && this.host.id === id;
+}
+
+// Getters and Setters for Captains
+lobbySchema.methods.getBlueCaptain = function() {
+    return this.blueCaptain;
+};
+
+lobbySchema.methods.getRedCaptain = function() {
+    return this.redCaptain;
+};
+
+lobbySchema.methods.setBlueCaptain = function(playerData) {
+    // Validate the player is on blue team
+    if (playerData.team !== 'blue') {
+        throw new Error('Blue captain must be on blue team');
+    }
+    this.blueCaptain = playerData;
+    return this.save();
+};
+
+lobbySchema.methods.setRedCaptain = function(playerData) {
+    // Validate the player is on red team
+    if (playerData.team !== 'red') {
+        throw new Error('Red captain must be on red team');
+    }
+    this.redCaptain = playerData;
+    return this.save();
+};
+
+lobbySchema.methods.removeBlueCaptain = function() {
+    this.blueCaptain = undefined;
+    return this.save();
+};
+
+lobbySchema.methods.removeRedCaptain = function() {
+    this.redCaptain = undefined;
+    return this.save();
+};
+
+// Getter and Setter for inGame
+lobbySchema.methods.getInGame = function() {
+    return this.inGame;
+};
+
+lobbySchema.methods.setInGame = function(value) {
+    if (typeof value !== 'boolean') {
+        throw new Error('inGame must be a boolean value');
+    }
+    this.inGame = value;
+    return this.save();
+};
+
+lobbySchema.methods.startGame = function() {
+    this.inGame = true;
+    return this.save();
+};
+
+lobbySchema.methods.endGame = function() {
+    this.inGame = false;
+    return this.save();
 };
 
 // Static Methods
