@@ -1,83 +1,128 @@
+import { User } from './User.js';
+import { Round } from './Round.js';
+
 export class Lobby {
     
-    code = null;
-    players = [];
-    gameState = "waiting";
-    currentRound = 0;
-    maxPlayers = 16;
-    rounds = 10;
-
-    constructor(code, hostName) {
-        this.code = code;
-        this.addPlayer(hostName, true);
-    }
-
-    addPlayer(name, isHost = false) {
-        if (this.players.length >= this.maxPlayers) {
-            return false;
+    // PARAMS:
+    // code is a UNIQUE 4 letter alphabetic code
+    // host is a type User 
+    constructor(code, host) {
+        host.isHost = true;
+        this.host = host;
+        this.code = null;
+        this.settings = {
+            rounds: 7,          // # Rounds
+            roundLimit: 60,     // Time Limit for each round
+            maxPlayers: 16,     // Max Players In Lobby (Unchangeable)
+            // tags: ["General"]   // TODO: Question categories
         }
-        
-        const player = {
-            name: name,
-            isHost: isHost,
-            team: "spectator",
-            role: null,
-            score: 0
-        };
-        
-        this.players.push(player);
-        return true;
-    }
 
-    removePlayer(name) {
-        this.players = this.players.filter(p => p.name !== name);
-    }
+        this.spectators = [this.host];
 
-    getPlayer(name) {
-        return this.players.find(p => p.name === name);
-    }
+        this.blueTeam = [];
+        this.blueCaptain = null;
+        this.redTeam = [];
+        this.redCaptain = null;
 
-    assignTeam(playerName, team, role = null) {
-        const player = this.getPlayer(playerName);
-        if (player) {
-            player.team = team;
-            player.role = role;
+        this.gameState = {
+            currentRoundNumber: 0,
+            rounds: [],
+            currentRound: Round,
         }
     }
 
-    getPlayersByTeam(team) {
-        return this.players.filter(p => p.team === team);
+    addPlayer(user) {
+        if (this.getTotalPlayers() >= this.settings.maxPlayers) {
+            throw new Error("Lobby full");
+        }
+
+        if (this.getPlayerByName(user.getName())) {
+            throw new Error("Name taken");
+        }
+
+        this.spectators.push(user);
     }
 
-    startGame() {
-        if (this.canStart()) {
-            this.gameState = "playing";
-            this.currentRound = 1;
+
+    setPlayer(user, team = "spectator", role = null) {
+        this.removePlayerFromTeam(user);
+        if (team === "spectator") {
+            this.spectators.push(user);
+        } else if (team === "blue") {
+            this.blueTeam.push(user);
+            if (role === "captain") {
+                this.blueCaptain = user;
+            }
+        } else if (team === "red") {
+            this.redTeam.push(user);
+            if (role === "captain") {
+                this.redCaptain = user;
+            }
         }
     }
 
-    canStart() {
-        const blueTeam = this.getPlayersByTeam("blue");
-        const redTeam = this.getPlayersByTeam("red");
-        
-        return blueTeam.length >= 1 && redTeam.length >= 1 && 
-               blueTeam.some(p => p.role === "captain") && 
-               redTeam.some(p => p.role === "captain");
+    removePlayerFromTeam(user) {
+        this.spectators = this.spectators.filter(p => p.name !== user.name);
+        this.blueTeam = this.blueTeam.filter(p => p.name !== user.name);
+        this.redTeam = this.redTeam.filter(p => p.name !== user.name);
+    }
+    
+    // Setters
+    setNumberOfRounds(numberOfRounds) {
+        this.settings.rounds = numberOfRounds;
+    }
+
+    setRoundLimit(roundLimit) {
+        this.settings.roundLimit = roundLimit;
+    }
+
+
+    // Getters
+    getHost() {
+        return this.host;
     }
 
     getCode() {
         return this.code;
     }
+    
+    getSettings() {
+        return this.settings;
+    }
 
+    getSpectators() {
+        return this.spectators;
+    }
+    
+    getBlueTeam() {
+        return this.blueTeam;
+    }
+
+    getRedTeam() {
+        return this.redTeam;
+    }
+    
+    getBlueCaptain() {
+        return this.blueCaptain;
+    }
+
+    getRedCaptain() {
+        return this.redCaptain;
+    }
+    
     getGameState() {
         return this.gameState;
     }
 
-    getCurrentRound() {
-        return this.currentRound;
+    getTotalPlayers() {
+        return this.spectators.length + this.blueTeam.length + this.redTeam.length;
     }
 
-    isFull() {
-        return this.players.length >= this.maxPlayers;
+    getPlayerByName(name) {
+        return this.spectators.find(p => p.name === name) ||
+               this.blueTeam.find(p => p.name === name) ||
+               this.redTeam.find(p => p.name === name);
     }
+    
+    
 } 
