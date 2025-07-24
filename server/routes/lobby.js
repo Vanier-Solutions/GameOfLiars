@@ -1,0 +1,178 @@
+import express from "express";
+import { Lobby } from "../models/Lobby.js";
+import { User } from "../models/User.js";
+
+const router = express.Router();
+
+// In-memory storage for active lobbies
+export const activeLobbies = new Map();
+
+// Generate unique lobby code
+function generateLobbyCode() {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let code;
+    do {
+        code = "";
+        for (let i = 0; i < 4; i++) {
+            code += letters[Math.floor(Math.random() * letters.length)];
+        }
+    } while (activeLobbies.has(code));
+    return code;
+}
+
+
+// POST /api/lobby/create
+router.post("/create", (req, res) => {
+    try {
+        const { playerName } = req.body;
+        if (!playerName || playerName.trim().length === 0) {
+            return res.status(400).json({ error: 'Player name is required' });
+        }
+        
+        if (playerName.length > 20) {
+            return res.status(400).json({ error: 'Player name too long (max 20 characters)' });
+        }
+
+        const code = generateLobbyCode();
+        const host = new User(playerName, true);
+        const lobby = new Lobby(code, host);
+
+        activeLobbies.set(code, lobby);
+
+        res.status(201).json({
+            success: true,
+            code: lobby.getCode(),
+            settings: lobby.getSettings()
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create lobby'
+        });
+    }
+});
+
+// POST /api/lobby/join
+router.post("/join", (req, res) => {
+    try {
+        const { code, playerName } = req.body;
+
+        if (!code || !playerName || code.trim().length !== 4 || playerName.trim().length === 0) {
+            return res.status(400).json({ error: 'Code and player name are required' });
+        }
+        if (playerName.trim().length > 20) {
+            return res.status(400).json({ error: 'Player name too long (max 20 characters)' });
+        }
+
+        const lobby = activeLobbies.get(code.toUpperCase());
+        if (!lobby) {
+            return res.status(404).json({ error: 'Lobby not found' });
+        }
+        if (lobby.gamePhase !== 'pregame') {
+            return res.status(400).json({ error: 'Game already in progress' });
+        }
+        if (lobby.getPlayerByName(playerName)) {
+            return res.status(400).json({ error: 'Player name already taken' });
+        }
+
+        try {
+            const newPlayer = new User(playerName);
+            lobby.addPlayer(newPlayer);
+        } catch (error) {
+            return res.status(400).json({ error: 'Failed to join lobby' }); // TODO
+        }
+
+        res.json({
+            success: true,
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to join lobby'
+        });
+    }
+});
+
+// GET /api/lobby/:code
+router.get('/:code', (req, res) => {
+    try {
+        const { code } = req.params;
+        const lobby = activeLobbies.get(code.toUpperCase());
+        
+        if (!lobby) {
+            return res.status(404).json({ error: 'Lobby not found' });
+        }
+        
+        res.json({
+            success: true,
+            lobby: {
+                code: lobby.getCode(),
+                host: lobby.getHost().getName(),
+                settings: lobby.getSettings(),
+                gamePhase: lobby.gamePhase,
+                players: {
+                    spectators: lobby.getSpectators().map(p => p.getName()),
+                    blueTeam: lobby.getBlueTeam().map(p => p.getName()),
+                    redTeam: lobby.getRedTeam().map(p => p.getName())
+                },
+                captains: {
+                    blue: lobby.getBlueCaptain()?.getName() || null,
+                    red: lobby.getRedCaptain()?.getName() || null
+                }
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get lobby info' });
+    }
+});
+
+// PUT /api/lobby/:code/settings
+router.put('/:code/settings', (req, res) => {
+    try {
+        const { code } = req.params;
+        const { rounds, roundLimit } = req.body;
+        const { playerName } = req.body; // To verify host permissions
+        
+        const lobby = activeLobbies.get(code.toUpperCase());
+        if (!lobby) {
+            return res.status(404).json({ error: 'Lobby not found' });
+        }
+        
+        // Verify the player is the host
+        if (lobby.getHost().getName() !== playerName) {
+            return res.status(403).json({ error: 'Only the host can change settings' });
+        }
+        
+        if (lobby.gamePhase !== 'pregame') {
+            return res.status(400).json({ error: 'Cannot change settings during game' });
+        }
+        
+        // Update settings
+        if (rounds !== undefined) {
+            if (rounds < 1 || rounds > 20) {
+                return res.status(400).json({ error: 'Rounds must be between 1 and 20' });
+            }
+            lobby.setNumberOfRounds(rounds);
+        }
+        
+        if (roundLimit !== undefined) {
+            if (roundLimit < 30 || roundLimit > 300) {
+                return res.status(400).json({ error: 'Round limit must be between 30 and 300 seconds' });
+            }
+            lobby.setRoundLimit(roundLimit);
+        }
+        
+        res.json({
+            success: true,
+            settings: lobby.getSettings()
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update settings' });
+    }
+});
+
+
+export default router;

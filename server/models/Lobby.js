@@ -40,11 +40,7 @@ export class Lobby {
         if (this.getTotalPlayers() >= this.settings.maxPlayers) {
             throw new Error("Lobby full");
         }
-
-        if (this.getPlayerByName(user.getName())) {
-            throw new Error("Name taken");
-        }
-
+        
         this.spectators.push(user);
     }
 
