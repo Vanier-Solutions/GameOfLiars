@@ -9,7 +9,8 @@ export class Lobby {
     constructor(code, host) {
         host.isHost = true;
         this.host = host;
-        this.code = null;
+        this.code = code;
+        this.gamePhase = "pregame"; // "pregame", "playing", "ended"
         this.settings = {
             rounds: 7,          // # Rounds
             roundLimit: 60,     // Time Limit for each round
@@ -24,9 +25,13 @@ export class Lobby {
         this.redTeam = [];
         this.redCaptain = null;
 
+        this.rounds = [];
         this.gameState = {
             currentRoundNumber: 0,
-            rounds: [],
+            scores: {
+                blue: 0,
+                red: 0,
+            },
             currentRound: Round,
         }
     }
@@ -66,6 +71,14 @@ export class Lobby {
         this.blueTeam = this.blueTeam.filter(p => p.name !== user.name);
         this.redTeam = this.redTeam.filter(p => p.name !== user.name);
     }
+
+    incrementScore(team) {
+        this.gameState.scores[team]++;
+    }
+
+    incrementRoundNumber() {
+        this.gameState.currentRoundNumber++;
+    }
     
     // Setters
     setNumberOfRounds(numberOfRounds) {
@@ -74,6 +87,18 @@ export class Lobby {
 
     setRoundLimit(roundLimit) {
         this.settings.roundLimit = roundLimit;
+    }
+
+    setGamePhase(phase) {
+        this.gamePhase = phase;
+    }
+
+    setRoundNumber(roundNumber) {
+        this.gameState.currentRoundNumber = roundNumber;
+    }
+    
+    setScore(team, score) {
+        this.gameState.scores[team] = score;
     }
 
 
