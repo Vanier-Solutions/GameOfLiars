@@ -7,7 +7,7 @@ export class Round {
         // this.questionTags = []; TODO
 
         this.roundStatus = "NS" // NS = Not Started, QP = Question period, QR = Question reveal, E = Ended
-        this.winner = null; // "Blue" or "Red"
+        this.winner = null; // "blue" or "red"
 
         this.blueTeamAnswer = null;
         this.redTeamAnswer = null;

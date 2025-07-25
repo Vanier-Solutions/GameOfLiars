@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const uri = process.env.URI || "";
 
 const connectDB = async () => {
+    console.log(process.env.URI);
     const maxRetries = 5;
     let retries = 0;
 

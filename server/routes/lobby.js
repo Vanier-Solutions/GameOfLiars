@@ -81,7 +81,13 @@ router.post("/join", (req, res) => {
             const newPlayer = new User(playerName);
             lobby.addPlayer(newPlayer);
         } catch (error) {
-            return res.status(400).json({ error: 'Failed to join lobby' }); // TODO
+            return res.status(400).json({ error: 'Failed to join lobby' });
+        }
+
+        // Broadcast team update
+        const gameEvents = req.app.locals.gameEvents;
+        if (gameEvents) {
+            gameEvents.broadcastTeamUpdate(code.toUpperCase());
         }
 
         res.json({
@@ -165,6 +171,12 @@ router.put('/:code/settings', (req, res) => {
             lobby.setRoundLimit(roundLimit);
         }
         
+        // Broadcast settings update
+        const gameEvents = req.app.locals.gameEvents;
+        if (gameEvents) {
+            gameEvents.broadcastSettingsUpdate(code.toUpperCase(), lobby.getSettings());
+        }
+
         res.json({
             success: true,
             settings: lobby.getSettings()

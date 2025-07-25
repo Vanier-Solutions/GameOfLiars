@@ -32,7 +32,7 @@ export class Lobby {
                 blue: 0,
                 red: 0,
             },
-            currentRound: Round,
+            currentRound: null,
         }
     }
 
@@ -66,6 +66,13 @@ export class Lobby {
         this.spectators = this.spectators.filter(p => p.name !== user.name);
         this.blueTeam = this.blueTeam.filter(p => p.name !== user.name);
         this.redTeam = this.redTeam.filter(p => p.name !== user.name);
+        if (this.blueCaptain === user) {
+            this.blueCaptain = null;
+        }
+        if (this.redCaptain === user) {
+            this.redCaptain = null;
+        }
+        user.removeTeam();
     }
 
     incrementScore(team) {
@@ -75,6 +82,8 @@ export class Lobby {
     incrementRoundNumber() {
         this.gameState.currentRoundNumber++;
     }
+    
+
     
     // Setters
     setNumberOfRounds(numberOfRounds) {

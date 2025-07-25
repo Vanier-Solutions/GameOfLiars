@@ -13,6 +13,11 @@ export class User {
         this.role = role;
     }
 
+    removeTeam() {
+        this.team = "spectator";
+        this.role = null;
+    }
+
     isCaptain() {
         return this.role === "captain";
     }
@@ -42,7 +47,4 @@ export class User {
         return this.role;
     }
 
-    getScore() {
-        return this.score;
-    }
 }

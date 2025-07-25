@@ -36,6 +36,12 @@ router.put('/team', (req, res) => {
         
         lobby.setPlayer(player, team, role);
         
+        // Broadcast team update
+        const gameEvents = req.app.locals.gameEvents;
+        if (gameEvents) {
+            gameEvents.broadcastTeamUpdate(code.toUpperCase());
+        }
+        
         res.json({
             success: true,
             player: {
