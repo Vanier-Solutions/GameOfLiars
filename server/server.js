@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
+import dotenv from "dotenv";
 import connectDB from "./db/connection.js";
 import lobbyRoutes from "./routes/lobby.js";
 import playerRoutes from "./routes/player.js";
@@ -8,6 +9,9 @@ import gameRoutes from "./routes/game.js";
 import { setupSocket } from "./socket/socketManager.js";
 import { setupGameEvents } from "./socket/gameEvents.js";
 import { activeLobbies } from "./routes/lobby.js";
+
+// Load environment variables
+dotenv.config();
 
 const PORT = process.env.PORT || 5051;
 const app = express();
