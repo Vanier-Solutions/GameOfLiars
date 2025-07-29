@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
 
 interface WebSocketMessage {
   type: string;
@@ -9,59 +8,67 @@ interface WebSocketMessage {
 export function useWebSocket(lobbyCode: string, playerName: string) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<any>(null);
 
   useEffect(() => {
     if (!lobbyCode || !playerName) return;
 
-    // Connect to Socket.io
-    const socket = io('http://localhost:5051');
-    socketRef.current = socket;
+    // Dynamic import to avoid build issues
+    import('socket.io-client').then(({ io }) => {
+      // Connect to Socket.io
+      const socket = io('http://localhost:5051');
+      socketRef.current = socket;
 
-    socket.on('connect', () => {
-      console.log('Socket.io connected');
-      setIsConnected(true);
-      
-      // Join lobby room
-      socket.emit('joinLobby', { code: lobbyCode, playerName });
-    });
+      socket.on('connect', () => {
+        console.log('Socket.io connected');
+        setIsConnected(true);
+        
+        // Join lobby room
+        socket.emit('joinLobby', { code: lobbyCode, playerName });
+      });
 
-    socket.on('disconnect', () => {
-      console.log('Socket.io disconnected');
-      setIsConnected(false);
-    });
+      socket.on('disconnect', () => {
+        console.log('Socket.io disconnected');
+        setIsConnected(false);
+      });
 
-    socket.on('connect_error', (error: Error) => {
-      console.error('Socket.io connection error:', error);
-      setIsConnected(false);
-    });
+      socket.on('connect_error', (error: Error) => {
+        console.error('Socket.io connection error:', error);
+        setIsConnected(false);
+      });
 
-    // Listen for lobby updates
-    socket.on('lobbyUpdate', (data: unknown) => {
-      setLastMessage({ type: 'lobbyUpdate', data });
-    });
+      // Listen for team updates
+      socket.on('teamUpdate', (data: unknown) => {
+        setLastMessage({ type: 'teamUpdate', data });
+      });
 
-    socket.on('playerJoined', (data: unknown) => {
-      setLastMessage({ type: 'playerJoined', data });
-    });
+      socket.on('playerJoined', (data: unknown) => {
+        setLastMessage({ type: 'playerJoined', data });
+      });
 
-    socket.on('playerLeft', (data: unknown) => {
-      setLastMessage({ type: 'playerLeft', data });
-    });
+      socket.on('playerLeft', (data: unknown) => {
+        setLastMessage({ type: 'playerLeft', data });
+      });
 
-    socket.on('teamUpdate', (data: unknown) => {
-      setLastMessage({ type: 'teamUpdate', data });
-    });
+      socket.on('settingsUpdate', (data: unknown) => {
+        setLastMessage({ type: 'settingsUpdate', data });
+      });
 
-    socket.on('gameStarted', (data: unknown) => {
-      setLastMessage({ type: 'gameStarted', data });
-      // Navigate to game
-      window.location.href = `/game/${lobbyCode}`;
+      socket.on('gameStarted', (data: unknown) => {
+        setLastMessage({ type: 'gameStarted', data });
+        // Navigate to game page when game starts
+        window.location.href = `/game/${lobbyCode}`;
+      });
+
+      socket.on('error', (error: { message: string }) => {
+        console.error('Socket error:', error.message);
+        setLastMessage({ type: 'error', data: error });
+      });
     });
 
     return () => {
-      if (socket.connected) {
-        socket.disconnect();
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.disconnect();
       }
     };
   }, [lobbyCode, playerName]);

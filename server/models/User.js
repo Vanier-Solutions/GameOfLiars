@@ -47,4 +47,8 @@ export class User {
         return this.role;
     }
 
+    getIsHost() {
+        return this.isHost;
+    }
+
 }
