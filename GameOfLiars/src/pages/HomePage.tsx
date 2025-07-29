@@ -19,7 +19,7 @@ export default function HomePage() {
     setError('');
     
     try {
-      const response = await fetch('http://localhost:5051/api/lobby/create', {
+      const response = await fetch('http://192.168.1.200:5051/api/lobby/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ export default function HomePage() {
     setError('');
     
     try {
-      const response = await fetch('http://localhost:5051/api/lobby/join', {
+      const response = await fetch('http://192.168.1.200:5051/api/lobby/join', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

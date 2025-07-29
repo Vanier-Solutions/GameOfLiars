@@ -14,9 +14,9 @@ export function useWebSocket(lobbyCode: string, playerName: string) {
     if (!lobbyCode || !playerName) return;
 
     // Dynamic import to avoid build issues
-    import('socket.io-client').then(({ io }) => {
+    import('socket.io-client').then((socketModule) => {
       // Connect to Socket.io
-      const socket = io('http://localhost:5051');
+      const socket = socketModule.default('http://192.168.1.200:5051');
       socketRef.current = socket;
 
       socket.on('connect', () => {

@@ -34,6 +34,8 @@ const gameEvents = setupGameEvents(io, activeLobbies);
 // Make gameEvents available to routes
 app.locals.gameEvents = gameEvents;
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is listening on port ${PORT}`);
+    console.log(`Local access: http://localhost:${PORT}`);
+    console.log(`Network access: http://192.168.1.200:${PORT}`);
 });

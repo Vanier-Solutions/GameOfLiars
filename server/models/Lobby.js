@@ -14,6 +14,7 @@ export class Lobby {
         this.settings = {
             rounds: 7,          // # Rounds
             roundLimit: 60,     // Time Limit for each round
+            maxScore: 10,       // Max score to win
             maxPlayers: 16,     // Max Players In Lobby (Unchangeable)
             // tags: ["General"]   // TODO: Question categories
         }
@@ -92,6 +93,10 @@ export class Lobby {
 
     setRoundLimit(roundLimit) {
         this.settings.roundLimit = roundLimit;
+    }
+
+    setMaxScore(maxScore) {
+        this.settings.maxScore = maxScore;
     }
 
     setGamePhase(phase) {

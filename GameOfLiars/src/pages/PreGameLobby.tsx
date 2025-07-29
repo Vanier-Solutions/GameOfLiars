@@ -63,7 +63,7 @@ export default function PreGameLobby() {
   const [settings, setSettings] = useState(lobbyData.settings);
 
   // Initialize Socket.io connection
-  const { isConnected, lastMessage } = useWebSocket(lobbyCode, playerName);
+  const { isConnected, lastMessage, sendMessage } = useWebSocket(lobbyCode, playerName);
 
   useEffect(() => {
     // Get lobby code from URL
@@ -85,14 +85,13 @@ export default function PreGameLobby() {
   // Listen for Socket.io updates
   useEffect(() => {
     if (lastMessage) {
-      
       switch (lastMessage.type) {
         case 'teamUpdate':
           // Refresh lobby data when teams change
           fetchLobbyData(lobbyCode);
           break;
         case 'settingsUpdate':
-          // Update settings when host changes them
+          // Update settings in real-time when host changes them
           const newSettings = lastMessage.data as any;
           if (newSettings) {
             setSettings(newSettings);
@@ -127,7 +126,7 @@ export default function PreGameLobby() {
     if (!code) return;
     
     try {
-      const response = await fetch(`http://localhost:5051/api/lobby/${code}`);
+      const response = await fetch(`http://192.168.1.200:5051/api/lobby/${code}`);
       const data = await response.json();
       
       if (data.success) {
@@ -182,7 +181,7 @@ export default function PreGameLobby() {
     try {
       setError(''); // Clear previous errors
       
-      const response = await fetch('http://localhost:5051/api/player/team', {
+      const response = await fetch('http://192.168.1.200:5051/api/player/team', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -197,12 +196,10 @@ export default function PreGameLobby() {
 
       const data = await response.json();
       
-      if (data.success) {
-        console.log(`Successfully joined ${team} team as ${role}`);
-        // The socket will receive a teamUpdate event and refresh the data automatically
-      } else {
+      if (!data.success) {
         setError(data.error || 'Failed to join team');
       }
+      // No need for success handling - Socket.io will update automatically
     } catch (err) {
       console.error('Failed to join team:', err);
       setError('Failed to join team');
@@ -213,7 +210,7 @@ export default function PreGameLobby() {
     try {
       setError('');
       
-      const response = await fetch('http://localhost:5051/api/player/team', {
+      const response = await fetch('http://192.168.1.200:5051/api/player/team', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -239,36 +236,15 @@ export default function PreGameLobby() {
     }
   };
 
-  const handleUpdateSettings = async () => {
+  const handleUpdateSettings = () => {
     if (!isHost) return;
     
-    try {
-      setError('');
-      
-      const response = await fetch(`http://localhost:5051/api/lobby/${lobbyCode}/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          playerName: playerName,
-          rounds: settings.rounds,
-          roundLimit: settings.roundLimit,
-          maxScore: settings.maxScore
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        console.log('Settings updated successfully');
-      } else {
-        setError(data.error || 'Failed to update settings');
-      }
-    } catch (err) {
-      console.error('Failed to update settings:', err);
-      setError('Failed to update settings');
-    }
+    // Send settings update via Socket.io for real-time updates
+    sendMessage('updateSettings', {
+      code: lobbyCode,
+      playerName: playerName,
+      settings: settings
+    });
   };
 
   const handleStartGame = async () => {
@@ -277,7 +253,7 @@ export default function PreGameLobby() {
     try {
       setError('');
       
-      const response = await fetch(`http://localhost:5051/api/game/${lobbyCode}/start`, {
+      const response = await fetch(`http://192.168.1.200:5051/api/game/${lobbyCode}/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -287,9 +263,7 @@ export default function PreGameLobby() {
 
       const data = await response.json();
       
-      if (data.success) {
-        console.log('Game started successfully');
-      } else {
+      if (!data.success) {
         setError(data.error || 'Failed to start game');
       }
     } catch (err) {
@@ -388,8 +362,7 @@ export default function PreGameLobby() {
                   <Button
                     onClick={() => handleJoinTeam('red', 'captain')}
                     variant="outline"
-                    disabled={playerTeam !== null}
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
                   >
                     Join as Captain
                   </Button>
@@ -413,25 +386,12 @@ export default function PreGameLobby() {
                     onClick={() => handleJoinTeam('red', 'player')}
                     variant="outline"
                     size="sm"
-                    disabled={playerTeam !== null}
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
                   >
                     Join Team
                   </Button>
                 </div>
               </div>
-
-              {/* Leave Team Button */}
-              {playerTeam?.team === 'red' && (
-                <Button
-                  onClick={handleLeaveTeam}
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-gray-300 text-gray-600 hover:bg-gray-50"
-                >
-                  Leave Team
-                </Button>
-              )}
             </div>
           </div>
 
@@ -526,23 +486,20 @@ export default function PreGameLobby() {
               </CardContent>
             </Card>
 
-            {/* Start Game */}
-            <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm">
-              <CardContent className="pt-6">
-                <Button
-                  onClick={handleStartGame}
-                  disabled={!canStartGame || !isHost}
-                  className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white font-medium disabled:bg-gray-300 disabled:text-gray-500"
-                >
-                  {canStartGame ? 'Start Game' : 'Need Captains for Both Teams'}
-                </Button>
-                {!isHost && (
-                  <p className="text-xs text-center text-gray-500 mt-2">
-                    Only the host can start the game
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            {/* Start Game - Only visible to host */}
+            {isHost && (
+              <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm">
+                <CardContent className="pt-6">
+                  <Button
+                    onClick={handleStartGame}
+                    disabled={!canStartGame}
+                    className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white font-medium disabled:bg-gray-300 disabled:text-gray-500"
+                  >
+                    {canStartGame ? 'Start Game' : 'Need Captains for Both Teams'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Blue Team */}
@@ -566,8 +523,7 @@ export default function PreGameLobby() {
                   <Button
                     onClick={() => handleJoinTeam('blue', 'captain')}
                     variant="outline"
-                    disabled={playerTeam !== null}
-                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
                   >
                     Join as Captain
                   </Button>
@@ -591,25 +547,12 @@ export default function PreGameLobby() {
                     onClick={() => handleJoinTeam('blue', 'player')}
                     variant="outline"
                     size="sm"
-                    disabled={playerTeam !== null}
-                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
                   >
                     Join Team
                   </Button>
                 </div>
               </div>
-
-              {/* Leave Team Button */}
-              {playerTeam?.team === 'blue' && (
-                <Button
-                  onClick={handleLeaveTeam}
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-gray-300 text-gray-600 hover:bg-gray-50"
-                >
-                  Leave Team
-                </Button>
-              )}
             </div>
           </div>
         </div>

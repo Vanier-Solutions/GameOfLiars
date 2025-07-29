@@ -92,6 +92,53 @@ export function setupSocket(server) {
             });
         });
 
+        // Settings update via Socket.io
+        socket.on('updateSettings', (data) => {
+            const { code, playerName, settings } = data;
+            const lobby = activeLobbies.get(code?.toUpperCase() || socket.lobbyCode);
+            
+            if (!lobby) return;
+
+            // Verify the player is the host
+            if (lobby.getHost().getName() !== playerName) {
+                socket.emit('error', { message: 'Only the host can change settings' });
+                return;
+            }
+
+            if (lobby.gamePhase !== 'pregame') {
+                socket.emit('error', { message: 'Cannot change settings during game' });
+                return;
+            }
+
+            // Update settings
+            if (settings.rounds !== undefined) {
+                if (settings.rounds < 1 || settings.rounds > 20) {
+                    socket.emit('error', { message: 'Rounds must be between 1 and 20' });
+                    return;
+                }
+                lobby.setNumberOfRounds(settings.rounds);
+            }
+            
+            if (settings.roundLimit !== undefined) {
+                if (settings.roundLimit < 30 || settings.roundLimit > 300) {
+                    socket.emit('error', { message: 'Round limit must be between 30 and 300 seconds' });
+                    return;
+                }
+                lobby.setRoundLimit(settings.roundLimit);
+            }
+
+            if (settings.maxScore !== undefined) {
+                if (settings.maxScore < 1 || settings.maxScore > 100) {
+                    socket.emit('error', { message: 'Max score must be between 1 and 100' });
+                    return;
+                }
+                lobby.setMaxScore(settings.maxScore);
+            }
+
+            // Broadcast settings update to all players in the lobby
+            io.to(socket.lobbyCode).emit('settingsUpdate', lobby.getSettings());
+        });
+
         // Disconnect handling
         socket.on('disconnect', () => {
             if (socket.lobbyCode) {
