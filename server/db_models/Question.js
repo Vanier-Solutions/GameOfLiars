@@ -1,6 +1,11 @@
-import mongoose from 'mongoose';
+﻿import mongoose from 'mongoose';
 
 const questionSchema = new mongoose.Schema({
+  id: {
+    type: Number,
+    unique: true,
+    sparse: true
+  },
   question: {
     type: String,
     required: true,
@@ -11,16 +16,22 @@ const questionSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  tags: {
-    type: [String],
-    default: ['general']
+  category: {
+    type: String,
+    default: 'general'
   },
   difficulty: {
     type: String,
-    enum: ['easy', 'medium', 'hard']
+    enum: ['easy', 'medium', 'hard'],
+    default: 'medium'
+  },
+  usedInLobbies: {
+    type: [String],
+    default: []
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  collection: 'qs'  // Explicitly specify collection name
 });
 
-export default mongoose.model('Question', questionSchema); 
+export default mongoose.model('Question', questionSchema);

@@ -7,7 +7,7 @@ const router = express.Router();
 // PUT /api/player/team
 router.put('/team', (req, res) => {
     try {
-        const { code, playerName, team, role } = req.body;
+        const { code, playerName, playerId, team, role } = req.body;
         
         const lobby = activeLobbies.get(code.toUpperCase());
         if (!lobby) {
@@ -18,7 +18,14 @@ router.put('/team', (req, res) => {
             return res.status(400).json({ error: 'Cannot change teams during game' });
         }
         
-        const player = lobby.getPlayerByName(playerName);
+        // Find player by UUID first, then by name as fallback
+        let player;
+        if (playerId) {
+            player = lobby.getPlayerById(playerId);
+        } else if (playerName) {
+            player = lobby.getPlayerByName(playerName);
+        }
+        
         if (!player) {
             return res.status(404).json({ error: 'Player not found' });
         }
@@ -28,7 +35,7 @@ router.put('/team', (req, res) => {
             if (role === 'captain') {
                 // Check if captain already exists for this team
                 const existingCaptain = team === 'blue' ? lobby.getBlueCaptain() : lobby.getRedCaptain();
-                if (existingCaptain && existingCaptain.getName() !== playerName) {
+                if (existingCaptain && existingCaptain.getName() !== player.getName()) {
                     return res.status(400).json({ error: `${team} team already has a captain` });
                 }
             }
@@ -45,6 +52,7 @@ router.put('/team', (req, res) => {
         res.json({
             success: true,
             player: {
+                id: player.getId(),
                 name: player.getName(),
                 team: player.getTeam(),
                 role: player.getRole()
@@ -69,31 +77,42 @@ router.post('/kick', (req, res) => {
             return res.status(404).json({ error: 'Lobby not found' });
         }
         
-        // Verify the player is the host
+        // Verify the player making the request is the host
         if (lobby.getHost().getName() !== hostName) {
             return res.status(403).json({ error: 'Only the host can kick players' });
         }
         
         // Find the player to kick
-        const player = lobby.getPlayerByName(playerToKick);
-        if (!player) {
-            return res.status(404).json({ error: 'Player not found' });
+        const playerToKickObj = lobby.getPlayerByName(playerToKick);
+        if (!playerToKickObj) {
+            return res.status(404).json({ error: 'Player to kick not found' });
         }
         
-        // Remove player from all teams
-        lobby.removePlayerFromTeam(player);
+        // Cannot kick the host
+        if (playerToKickObj.getName() === lobby.getHost().getName()) {
+            return res.status(400).json({ error: 'Cannot kick the host' });
+        }
         
-        // Broadcast team update
+        const kickedPlayerName = playerToKickObj.getName();
+        const kickedPlayerId = playerToKickObj.getId();
+        
+        // Remove player from all teams and lobby
+        lobby.removePlayerFromTeam(playerToKickObj);
+        
+        // Broadcast player kicked event to notify the kicked player
         const gameEvents = req.app.locals.gameEvents;
         if (gameEvents) {
+            gameEvents.broadcastPlayerKicked(code.toUpperCase(), kickedPlayerName, kickedPlayerId);
+            // Also broadcast team update to refresh the UI for remaining players
             gameEvents.broadcastTeamUpdate(code.toUpperCase());
         }
         
         res.json({
             success: true,
-            message: `${playerToKick} has been kicked from the lobby`
+            message: `${kickedPlayerName} has been kicked from the lobby`
         });
     } catch (error) {
+        console.error('Kick player error:', error);
         res.status(500).json({ error: 'Failed to kick player' });
     }
 });

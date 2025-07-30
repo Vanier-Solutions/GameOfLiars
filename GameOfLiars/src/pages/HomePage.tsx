@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { API_URL } from '../config/api';
 
 export default function HomePage() {
   const [playerName, setPlayerName] = useState('');
@@ -11,71 +13,88 @@ export default function HomePage() {
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleCreateLobby = async () => {
-    if (!playerName.trim()) return;
-    
-    setIsCreating(true);
-    setError('');
-    
+    if (!playerName.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
     try {
-      const response = await fetch('http://192.168.1.200:5051/api/lobby/create', {
+      setError('');
+      setIsCreating(true);
+
+      const response = await fetch(`${API_URL}/api/lobby/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ playerName: playerName.trim() }),
       });
-      
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        setError(`Failed to create lobby: ${errorText}`);
+        setIsCreating(false);
+        return;
+      }
+
       const data = await response.json();
       
-      if (data.success && data.code) {
-        // Store player name and navigate to lobby
+      if (data.success) {
         localStorage.setItem('playerName', playerName.trim());
-        console.log(`Created lobby ${data.code} with host ${playerName.trim()}`);
-        window.location.href = `/lobby/${data.code}?player=${encodeURIComponent(playerName.trim())}`;
+        localStorage.setItem('playerId', data.playerId);
+        navigate(`/lobby/${data.code}`);
       } else {
         setError(data.error || 'Failed to create lobby');
       }
     } catch (error) {
-      console.error('Failed to create lobby:', error);
-      setError('Failed to connect to server');
+      setError('Failed to create lobby');
     } finally {
       setIsCreating(false);
     }
   };
 
   const handleJoinLobby = async () => {
-    if (!playerName.trim() || !lobbyCode.trim()) return;
-    
-    setIsJoining(true);
-    setError('');
-    
+    if (!playerName.trim() || !lobbyCode.trim()) {
+      setError('Please enter both your name and lobby code');
+      return;
+    }
+
     try {
-      const response = await fetch('http://192.168.1.200:5051/api/lobby/join', {
+      setIsJoining(true);
+      setError('');
+      
+      const response = await fetch(`${API_URL}/api/lobby/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           playerName: playerName.trim(),
-          code: lobbyCode.trim().toUpperCase()
+          lobbyCode: lobbyCode.trim().toUpperCase()
         }),
       });
-      
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        setError(`Failed to join lobby: ${errorText}`);
+        setIsJoining(false);
+        return;
+      }
+
       const data = await response.json();
       
       if (data.success) {
-        // Store player name and navigate to lobby
         localStorage.setItem('playerName', playerName.trim());
-        console.log(`Joined lobby ${lobbyCode.toUpperCase()} as ${playerName.trim()}`);
-        window.location.href = `/lobby/${lobbyCode.trim().toUpperCase()}?player=${encodeURIComponent(playerName.trim())}`;
+        localStorage.setItem('playerId', data.playerId);
+        navigate(`/lobby/${data.code}`);
       } else {
         setError(data.error || 'Failed to join lobby');
       }
     } catch (error) {
-      console.error('Failed to join lobby:', error);
-      setError('Failed to connect to server');
+      setError('Failed to join lobby');
     } finally {
       setIsJoining(false);
     }

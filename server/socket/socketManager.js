@@ -4,7 +4,7 @@ import { activeLobbies } from '../routes/lobby.js';
 export function setupSocket(server) {
     const io = new Server(server, {
         cors: {
-            origin: "*", // TODO: Set specific origin in production
+            origin: "*",
             methods: ["GET", "POST"]
         }
     });
@@ -56,21 +56,38 @@ export function setupSocket(server) {
 
         // Team chat
         socket.on('teamChat', (data) => {
-            const { message } = data;
+            const { playerName, message } = data;
             const lobby = activeLobbies.get(socket.lobbyCode);
             
             if (!lobby) return;
 
-            const player = lobby.getPlayerByName(socket.playerName);
+            const player = lobby.getPlayerByName(playerName || socket.playerName);
             if (!player) return;
 
             const team = player.getTeam();
             if (team === 'spectator') return;
 
-            // Send to team members only
-            socket.to(socket.lobbyCode).emit('teamChat', {
-                playerName: socket.playerName,
+            // Send to all team members (including sender)
+            io.to(socket.lobbyCode).emit('teamChat', {
+                playerName: playerName || socket.playerName,
                 team: team,
+                message: message
+            });
+        });
+
+        // Game chat (for all players)
+        socket.on('gameChat', (data) => {
+            const { playerName, message } = data;
+            const lobby = activeLobbies.get(socket.lobbyCode);
+            
+            if (!lobby) return;
+
+            const player = lobby.getPlayerByName(playerName || socket.playerName);
+            if (!player) return;
+
+            // Send to all players in the game (including sender)
+            io.to(socket.lobbyCode).emit('gameChat', {
+                playerName: playerName || socket.playerName,
                 message: message
             });
         });

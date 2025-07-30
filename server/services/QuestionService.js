@@ -1,54 +1,63 @@
-// Temporary hardcoded questions until we implement database
-const questions = [
-    {
-        question: "What do cows drink?",
-        answer: "Water"
-    },
-    {
-        question: "What color is the sky?",
-        answer: "Blue"
-    },
-    {
-        question: "How many legs does a cat have?",
-        answer: "Four"
-    },
-    {
-        question: "What is the opposite of hot?",
-        answer: "Cold"
-    },
-    {
-        question: "What do you use to write on paper?",
-        answer: "Pen"
-    },
-    {
-        question: "What is the largest planet in our solar system?",
-        answer: "Jupiter"
-    },
-    {
-        question: "What do you call a baby dog?",
-        answer: "Puppy"
-    },
-    {
-        question: "What is the capital of France?",
-        answer: "Paris"
-    },
-    {
-        question: "How many days are in a week?",
-        answer: "Seven"
-    },
-    {
-        question: "What do you wear on your feet?",
-        answer: "Shoes"
-    }
-];
+﻿import Question from '../db_models/Question.js';
+import mongoose from 'mongoose';
 
-export class QuestionService {
-    static getRandomQuestion() {
-        const randomIndex = Math.floor(Math.random() * questions.length);
-        return questions[randomIndex];
+const getRandomQuestion = async (lobbyCode) => {
+    try {
+        const db = mongoose.connection.db;
+        const dbName = db.databaseName;
+        const collectionName = 'qs';
+
+        const totalQuestions = await Question.countDocuments();
+        
+        if (totalQuestions === 0) {
+            throw new Error('No questions found in database at all');
+        }
+
+        // Get questions that haven't been used in this lobby
+        const usedQuestions = await Question.distinct('usedInLobbies', { usedInLobbies: lobbyCode });
+        const availableQuestions = await Question.find({ 
+            _id: { $nin: usedQuestions } 
+        });
+
+        if (availableQuestions.length === 0) {
+            // All questions have been used, reset by clearing usedInLobbies for this lobby
+            await Question.updateMany(
+                { usedInLobbies: lobbyCode },
+                { $pull: { usedInLobbies: lobbyCode } }
+            );
+            
+            const allQuestions = await Question.find();
+            const randomIndex = Math.floor(Math.random() * allQuestions.length);
+            const selectedQuestion = allQuestions[randomIndex];
+            
+            // Mark as used
+            await Question.findByIdAndUpdate(selectedQuestion._id, {
+                $push: { usedInLobbies: lobbyCode }
+            });
+            
+            return {
+                question: selectedQuestion.question,
+                correctAnswer: selectedQuestion.correctAnswer
+            };
+        }
+
+        // Select random question from available ones
+        const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+        const selectedQuestion = availableQuestions[randomIndex];
+        
+        // Mark as used
+        await Question.findByIdAndUpdate(selectedQuestion._id, {
+            $push: { usedInLobbies: lobbyCode }
+        });
+        
+        return {
+            question: selectedQuestion.question,
+            correctAnswer: selectedQuestion.correctAnswer
+        };
+    } catch (error) {
+        console.error('Error fetching random question:', error);
+        throw error;
     }
-    
-    static getAllQuestions() {
-        return questions;
-    }
-} 
+};
+
+export default getRandomQuestion;

@@ -1,41 +1,77 @@
-import express from "express";
-import cors from "cors";
-import { createServer } from "http";
-import dotenv from "dotenv";
-import connectDB from "./db/connection.js";
-import lobbyRoutes from "./routes/lobby.js";
-import playerRoutes from "./routes/player.js";
-import gameRoutes from "./routes/game.js";
-import { setupSocket } from "./socket/socketManager.js";
-import { setupGameEvents } from "./socket/gameEvents.js";
-import { activeLobbies } from "./routes/lobby.js";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import connectDB from './db/connection.js';
+import lobbyRoutes from './routes/lobby.js';
+import playerRoutes from './routes/player.js';
+import gameRoutes from './routes/game.js';
+import { setupSocket } from './socket/socketManager.js';
+import { setupGameEvents } from './socket/gameEvents.js';
+import { activeLobbies } from './routes/lobby.js';
 
-// Load environment variables
 dotenv.config();
 
-const PORT = process.env.PORT || 5051;
 const app = express();
-const server = createServer(app);
+const PORT = process.env.PORT || 5051;
 
-await connectDB();
-
-app.use(cors()); // TODO: Need to add specific origin
+// Middleware
+app.use(cors({
+  origin: "*", // Allow all origins for development
+  credentials: true
+}));
 app.use(express.json());
 
-// API Routes
-app.use("/api/lobby", lobbyRoutes);
-app.use("/api/player", playerRoutes);
-app.use("/api/game", gameRoutes);
+// Add a simple health check route
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'Server is running', 
+    message: 'Game of Liars API Server',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Routes
+app.use('/api/lobby', lobbyRoutes);
+app.use('/api/player', playerRoutes);
+app.use('/api/game', gameRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({ 
+    success: false, 
+    error: 'Internal server error',
+    message: err.message 
+  });
+});
+
+// 404 handler - catch all unmatched routes
+app.use((req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    error: 'Route not found',
+    path: req.originalUrl 
+  });
+});
+
+// Connect to MongoDB
+connectDB();
+
+// Start server
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is listening on port ${PORT}`);
+  console.log(`Local access: http://localhost:${PORT}`);
+  
+  // Use environment variable for network access or default to localhost
+  const networkUrl = process.env.NETWORK_URL || `http://localhost:${PORT}`;
+  console.log(`Network access: ${networkUrl}`);
+});
 
 // Setup Socket.io
 const io = setupSocket(server);
-const gameEvents = setupGameEvents(io, activeLobbies);
 
-// Make gameEvents available to routes
+// Setup game events and make them available to routes
+const gameEvents = setupGameEvents(io, activeLobbies);
 app.locals.gameEvents = gameEvents;
 
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is listening on port ${PORT}`);
-    console.log(`Local access: http://localhost:${PORT}`);
-    console.log(`Network access: http://192.168.1.200:${PORT}`);
-});
+console.log('Server setup complete');

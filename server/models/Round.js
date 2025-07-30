@@ -1,22 +1,20 @@
 export class Round {
 
-    constructor(roundNumber, question, answer) {
+    constructor(roundNumber, question, correctAnswer) {
         this.roundNumber = roundNumber;
         this.question = question;
-        this.answer = answer;
-        // this.questionTags = []; TODO
-
-        this.roundStatus = "NS" // NS = Not Started, QP = Question period, QR = Question reveal, E = Ended
-        this.winner = null; // "blue" or "red"
-
-        this.blueTeamAnswer = null;
-        this.redTeamAnswer = null;
-        this.blueTeamStole = false;
-        this.redTeamStole = false;
-        this.blueCaptainReady = false;
-        this.redCaptainReady = false;
-
+        this.correctAnswer = correctAnswer;
+        this.roundStatus = 'NS'; // NS = Not Started, QP = Question Period, QR = Question Reveal
         this.roundStartTime = null;
+        this.teamAnswers = {
+            blue: null,
+            red: null
+        };
+        this.captainReady = {
+            blue: false,
+            red: false
+        };
+        this.winner = null;
     }
 
     // Setters
@@ -29,12 +27,15 @@ export class Round {
     }
 
     setTeamAnswer(team, answer, isSteal) {
+        const answerObj = {
+            answer: answer,
+            isSteal: isSteal
+        };
+        
         if (team === "blue") {
-            this.blueTeamAnswer = answer;
-            this.blueTeamStole = isSteal;
+            this.blueTeamAnswer = answerObj;
         } else if (team === "red") {
-            this.redTeamAnswer = answer;
-            this.redTeamStole = isSteal;
+            this.redTeamAnswer = answerObj;
         }
     }
 
@@ -55,8 +56,8 @@ export class Round {
         return this.question;
     }
 
-    getAnswer() {
-        return this.answer;
+    getCorrectAnswer() {
+        return this.correctAnswer;
     }
 
     getRoundStatus() {
@@ -75,14 +76,6 @@ export class Round {
         }
     }
     
-    getTeamStole(team) {
-        if (team === "blue") {
-            return this.blueTeamStole;
-        } else if (team === "red") {
-            return this.redTeamStole;
-        }
-    }
-    
     getCaptainReady(team) {
         if (team === "blue") {
             return this.blueCaptainReady;
@@ -90,6 +83,4 @@ export class Round {
             return this.redCaptainReady;
         }
     }
-    
-    
 }

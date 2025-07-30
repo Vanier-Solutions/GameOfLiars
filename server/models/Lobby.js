@@ -12,12 +12,10 @@ export class Lobby {
         this.code = code;
         this.gamePhase = "pregame"; // "pregame", "playing", "ended"
         this.settings = {
-            rounds: 7,          // # Rounds
-            roundLimit: 60,     // Time Limit for each round
-            maxScore: 10,       // Max score to win
-            maxPlayers: 16,     // Max Players In Lobby (Unchangeable)
-            // tags: ["General"]   // TODO: Question categories
-        }
+            rounds: 7,
+            roundLimit: 60,
+            maxScore: 10
+        };
 
         this.spectators = [this.host];
 
@@ -48,6 +46,9 @@ export class Lobby {
 
     setPlayer(user, team = "spectator", role = null) {
         this.removePlayerFromTeam(user);
+        
+        user.assignTeam(team, role);
+        
         if (team === "spectator") {
             this.spectators.push(user);
         } else if (team === "blue") {
@@ -76,8 +77,16 @@ export class Lobby {
         user.removeTeam();
     }
 
-    incrementScore(team) {
-        this.gameState.scores[team]++;
+    incrementScore(team, points = 1) {
+        this.gameState.scores[team] += points;
+        // Ensure score doesn't go below 0
+        if (this.gameState.scores[team] < 0) {
+            this.gameState.scores[team] = 0;
+        }
+    }
+
+    getScore(team) {
+        return this.gameState.scores[team];
     }
 
     incrementRoundNumber() {
@@ -157,6 +166,12 @@ export class Lobby {
         return this.spectators.find(p => p.name === name) ||
                this.blueTeam.find(p => p.name === name) ||
                this.redTeam.find(p => p.name === name);
+    }
+
+    getPlayerById(id) {
+        return this.spectators.find(p => p.getId() === id) ||
+               this.blueTeam.find(p => p.getId() === id) ||
+               this.redTeam.find(p => p.getId() === id);
     }
     
     

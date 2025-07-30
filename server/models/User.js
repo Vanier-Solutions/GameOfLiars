@@ -1,5 +1,8 @@
+import { v4 as uuidv4 } from 'uuid';
+
 export class User {
     constructor(name, isHost = false) {
+        this.id = uuidv4(); // Generate unique UUID for this user
         this.name = name;
         this.isHost = isHost;
         this.team = "spectator";
@@ -35,6 +38,10 @@ export class User {
     }
 
     // Getters for data integrity
+    getId() {
+        return this.id;
+    }
+
     getName() {
         return this.name;
     }

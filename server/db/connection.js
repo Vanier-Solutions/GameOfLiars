@@ -1,42 +1,47 @@
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const uri = process.env.URI || "";
+import mongoose from 'mongoose';
 
 const connectDB = async () => {
-    console.log(process.env.URI);
-    const maxRetries = 5;
-    let retries = 0;
+  const uri = process.env.URI;
+  
+  if (!uri) {
+    throw new Error('MongoDB URI not found in environment variables');
+  }
 
-    while (retries < maxRetries) {
-        try {
-            await mongoose.connect(uri, {
-                serverSelectionTimeoutMS: 30000, // Increase timeout
-                socketTimeoutMS: 45000,
-                connectTimeoutMS: 30000,
-                maxPoolSize: 5, // Reduce pool size
-                retryWrites: true,
-                w: 'majority'
-            });
+  let connectionUri = uri;
+  
+  // Ensure we're connecting to the 'gol' database
+  if (!uri.includes('/gol')) {
+    connectionUri = uri.replace('mongodb+srv://', 'mongodb+srv://').replace('?', '/gol?');
+  }
 
-            console.log("Successfully connected to MongoDB using Mongoose.");
-            return;
-        } catch (err) {
-            retries++;
-            console.error(`Connection attempt ${retries} failed:`, err.message);
-            
-            if (retries === maxRetries) {
-                console.error("Max retries reached. Exiting...");
-                process.exit(1);
-            }
-            
-            // Wait 2 seconds before retrying
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+  const options = {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+  };
+
+  let retries = 0;
+  const maxRetries = 5;
+
+  while (retries < maxRetries) {
+    try {
+      await mongoose.connect(connectionUri, options);
+      console.log("Successfully connected to MongoDB using Mongoose.");
+      return;
+    } catch (err) {
+      retries++;
+      console.error(`Connection attempt ${retries} failed:`, err.message);
+      
+      if (retries >= maxRetries) {
+        console.error('Max retries reached. Could not connect to MongoDB.');
+        throw err;
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
-}
+  }
+};
 
 // Connection Events
 mongoose.connection.on('error', (err) => {

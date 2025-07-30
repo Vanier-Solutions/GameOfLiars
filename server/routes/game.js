@@ -1,101 +1,76 @@
-import express from "express";
-import { activeLobbies } from "./lobby.js";
-import { GameService } from "../services/GameService.js";
+﻿import express from 'express';
+import { GameService } from '../services/GameService.js';
+import { activeLobbies } from './lobby.js';
 
 const router = express.Router();
 
 // POST /api/game/:code/start
-router.post("/:code/start", (req, res) => {
+router.post("/:code/start", async (req, res) => {
     try {
         const { code } = req.params;
-        const { playerName } = req.body;
+        const { playerId } = req.body;
         
-        const lobby = activeLobbies.get(code.toUpperCase());
+        const lobby = activeLobbies.get(code);
         if (!lobby) {
-            return res.status(404).json({ error: 'Lobby not found' });
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify the player is the host
-        if (lobby.getHost().getName() !== playerName) {
-            return res.status(403).json({ error: 'Only the host can start the game' });
+        // Verify host
+        const player = lobby.getPlayerById(playerId) || lobby.getPlayerByName(req.body.playerName);
+        if (!player || player.getName() !== lobby.getHost().getName()) {
+            return res.status(403).json({ success: false, error: 'Only the host can start the game' });
         }
         
-        const newRound = GameService.startGame(lobby);
+        const round = await GameService.startGame(lobby);
         
-        // Broadcast game started
-        const gameEvents = req.app.locals.gameEvents;
-        if (gameEvents) {
-            gameEvents.broadcastGameStarted(code.toUpperCase());
+        // Broadcast game started event
+        if (req.app.locals.gameEvents) {
+            req.app.locals.gameEvents.broadcastGameStarted(lobby.getCode());
         }
         
         res.json({
             success: true,
-            gameState: lobby.getGameState(),
-            roundData: {
-                roundNumber: newRound.getRoundNumber(),
-                question: newRound.getQuestion(),
-                roundStartTime: newRound.roundStartTime
-            }
+            gamePhase: lobby.gamePhase,
+            roundNumber: round.getRoundNumber(),
+            question: round.getQuestion()
         });
-        
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to start game' });
+        console.error('Error starting game:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// PUT /api/game/:code/round/ready
-router.put("/:code/round/ready", (req, res) => {
+// POST /api/game/:code/round/start - New endpoint for starting individual rounds
+router.post("/:code/round/start", async (req, res) => {
     try {
         const { code } = req.params;
-        const { playerName, ready } = req.body;
+        const { playerId } = req.body;
         
-        const lobby = activeLobbies.get(code.toUpperCase());
+        const lobby = activeLobbies.get(code);
         if (!lobby) {
-            return res.status(404).json({ error: 'Lobby not found' });
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        if (lobby.gamePhase !== 'playing') {
-            return res.status(400).json({ error: 'Game not in progress' });
+        // Verify host
+        const player = lobby.getPlayerById(playerId) || lobby.getPlayerByName(req.body.playerName);
+        if (!player || player.getName() !== lobby.getHost().getName()) {
+            return res.status(403).json({ success: false, error: 'Only the host can start rounds' });
         }
         
-        const player = lobby.getPlayerByName(playerName);
-        if (!player) {
-            return res.status(404).json({ error: 'Player not found' });
-        }
+        const roundData = await GameService.startRound(lobby);
         
-        // Verify player is a captain
-        if (!player.isCaptain()) {
-            return res.status(403).json({ error: 'Only captains can ready up' });
-        }
-        
-        const currentRound = lobby.gameState.currentRound;
-        if (!currentRound) {
-            return res.status(400).json({ error: 'No active round' });
-        }
-        
-        const team = player.getTeam();
-        const result = GameService.setCaptainReady(lobby, team, ready);
-        
-        // Broadcast captain ready status
-        const gameEvents = req.app.locals.gameEvents;
-        if (gameEvents) {
-            gameEvents.broadcastCaptainReady(code.toUpperCase(), team, ready, result.bothReady);
-            
-            // If round started, broadcast round start
-            if (result.roundStarted && result.roundData) {
-                gameEvents.broadcastRoundStarted(code.toUpperCase(), result.roundData);
-            }
+        // Broadcast round started event
+        if (req.app.locals.gameEvents) {
+            req.app.locals.gameEvents.broadcastRoundStarted(lobby.getCode(), roundData);
         }
         
         res.json({
             success: true,
-            ...result
+            roundData: roundData
         });
-        
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to update ready status' });
+        console.error('Error starting round:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -105,105 +80,108 @@ router.post("/:code/round/answer", (req, res) => {
         const { code } = req.params;
         const { playerName, answer, isSteal } = req.body;
         
-        const lobby = activeLobbies.get(code.toUpperCase());
+        const lobby = activeLobbies.get(code);
         if (!lobby) {
-            return res.status(404).json({ error: 'Lobby not found' });
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        if (lobby.gamePhase !== 'playing') {
-            return res.status(400).json({ error: 'Game not in progress' });
-        }
-        
+        // Find player and verify they are a captain
         const player = lobby.getPlayerByName(playerName);
         if (!player) {
-            return res.status(404).json({ error: 'Player not found' });
+            return res.status(404).json({ success: false, error: 'Player not found' });
         }
         
-        // Verify player is a captain
         if (!player.isCaptain()) {
-            return res.status(403).json({ error: 'Only captains can submit answers' });
-        }
-        
-        const currentRound = lobby.gameState.currentRound;
-        if (!currentRound) {
-            return res.status(400).json({ error: 'No active round' });
+            return res.status(403).json({ success: false, error: 'Only captains can submit answers' });
         }
         
         const team = player.getTeam();
+        if (team === 'spectator') {
+            return res.status(403).json({ success: false, error: 'Spectators cannot submit answers' });
+        }
+        
         const result = GameService.submitAnswer(lobby, team, answer, isSteal);
         
-        // Broadcast answer submitted
-        const gameEvents = req.app.locals.gameEvents;
-        if (gameEvents) {
-            gameEvents.broadcastAnswerSubmitted(code.toUpperCase(), team, result.bothAnswered);
+        // Broadcast answer submitted event
+        if (req.app.locals.gameEvents) {
+            req.app.locals.gameEvents.broadcastAnswerSubmitted(lobby.getCode(), {
+                team: team,
+                isSteal: isSteal,
+                bothAnswered: result.bothAnswered
+            });
             
-            // If both teams answered, broadcast round ended
-            if (result.bothAnswered) {
-                gameEvents.broadcastRoundEnded(code.toUpperCase());
+            // If both teams answered, broadcast round results
+            if (result.bothAnswered && result.roundData) {
+                req.app.locals.gameEvents.broadcastRoundResults(lobby.getCode(), result.roundData);
             }
         }
         
         res.json({
             success: true,
-            ...result
+            team: team,
+            answer: answer,
+            isSteal: isSteal,
+            bothAnswered: result.bothAnswered,
+            roundData: result.roundData
         });
-        
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to submit answer' });
+        console.error('Error submitting answer:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// POST /api/game/:code/round/winner
-router.post("/:code/round/winner", (req, res) => {
+// POST /api/game/:code/round/next
+router.post("/:code/round/next", async (req, res) => {
     try {
         const { code } = req.params;
-        const { playerName, winner } = req.body; // winner: "blue", "red", or "tie"
+        const { playerId } = req.body;
         
-        const lobby = activeLobbies.get(code.toUpperCase());
+        const lobby = activeLobbies.get(code);
         if (!lobby) {
-            return res.status(404).json({ error: 'Lobby not found' });
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify the player is the host
-        if (lobby.getHost().getName() !== playerName) {
-            return res.status(403).json({ error: 'Only the host can determine winner' });
+        // Verify host
+        const player = lobby.getPlayerById(playerId) || lobby.getPlayerByName(req.body.playerName);
+        if (!player || player.getName() !== lobby.getHost().getName()) {
+            return res.status(403).json({ success: false, error: 'Only the host can start next round' });
         }
         
-        if (lobby.gamePhase !== 'playing') {
-            return res.status(400).json({ error: 'Game not in progress' });
-        }
+        const result = await GameService.nextRound(lobby);
         
-        const currentRound = lobby.gameState.currentRound;
-        if (!currentRound) {
-            return res.status(400).json({ error: 'No active round' });
-        }
-        
-        const result = GameService.determineWinner(lobby, winner);
-        
-        // Broadcast winner determined
-        const gameEvents = req.app.locals.gameEvents;
-        if (gameEvents) {
-            gameEvents.broadcastWinnerDetermined(code.toUpperCase(), winner, lobby.gameState.scores, result.gameEnded);
-            
-            // If game ended, broadcast game ended
-            if (result.gameEnded) {
-                gameEvents.broadcastGameEnded(code.toUpperCase(), lobby.gameState.scores);
+        if (result.gameEnded) {
+            // Broadcast game ended event
+            if (req.app.locals.gameEvents) {
+                req.app.locals.gameEvents.broadcastGameEnded(lobby.getCode(), result);
             }
+            
+            res.json({
+                success: true,
+                gameEnded: true,
+                winner: result.winner,
+                finalScores: result.finalScores
+            });
+        } else {
+            // Broadcast next round event with round data
+            if (req.app.locals.gameEvents) {
+                req.app.locals.gameEvents.broadcastNextRound(lobby.getCode(), {
+                    roundNumber: result.currentRoundNumber,
+                    question: result.newRound.getQuestion(),
+                    roundData: result.roundData
+                });
+            }
+            
+            res.json({
+                success: true,
+                gameEnded: false,
+                roundNumber: result.currentRoundNumber,
+                question: result.newRound.getQuestion(),
+                roundData: result.roundData
+            });
         }
-        
-        res.json({
-            success: true,
-            winner: winner,
-            scores: lobby.gameState.scores,
-            gamePhase: lobby.gamePhase,
-            currentRound: lobby.gameState.currentRoundNumber,
-            gameEnded: result.gameEnded
-        });
-        
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to determine winner' });
+        console.error('Error starting next round:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -211,40 +189,109 @@ router.post("/:code/round/winner", (req, res) => {
 router.get("/:code/state", (req, res) => {
     try {
         const { code } = req.params;
+        const lobby = activeLobbies.get(code);
         
-        const lobby = activeLobbies.get(code.toUpperCase());
         if (!lobby) {
-            return res.status(404).json({ error: 'Lobby not found' });
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        const currentRound = lobby.gameState.currentRound;
-        let roundData = null;
+        const gameState = lobby.getGameState();
+        const currentRound = gameState.currentRound;
         
+        let roundData = null;
         if (currentRound) {
             roundData = {
                 roundNumber: currentRound.getRoundNumber(),
                 question: currentRound.getQuestion(),
                 roundStatus: currentRound.getRoundStatus(),
                 roundStartTime: currentRound.roundStartTime,
-                blueCaptainReady: currentRound.getCaptainReady('blue'),
-                redCaptainReady: currentRound.getCaptainReady('red'),
-                blueAnswered: currentRound.getTeamAnswer('blue') !== null,
-                redAnswered: currentRound.getTeamAnswer('red') !== null
+                blueAnswer: currentRound.getTeamAnswer('blue'),
+                redAnswer: currentRound.getTeamAnswer('red'),
+                winner: currentRound.getWinner()
             };
         }
         
         res.json({
             success: true,
             gamePhase: lobby.gamePhase,
-            scores: lobby.gameState.scores,
-            currentRoundNumber: lobby.gameState.currentRoundNumber,
-            roundData: roundData,
-            settings: lobby.getSettings()
+            currentRoundNumber: gameState.currentRoundNumber,
+            scores: gameState.scores,
+            settings: lobby.getSettings(),
+            roundData: roundData
         });
-        
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to get game state' });
+        console.error('Error fetching game state:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/game/:code/return-to-lobby
+router.post("/:code/return-to-lobby", (req, res) => {
+    try {
+        const { code } = req.params;
+        const { playerId } = req.body;
+        
+        const lobby = activeLobbies.get(code);
+        if (!lobby) {
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
+        }
+        
+        // Verify host
+        const player = lobby.getPlayerById(playerId) || lobby.getPlayerByName(req.body.playerName);
+        if (!player || player.getName() !== lobby.getHost().getName()) {
+            return res.status(403).json({ success: false, error: 'Only the host can return to lobby' });
+        }
+        
+        // Broadcast return to lobby event
+        if (req.app.locals.gameEvents) {
+            req.app.locals.gameEvents.broadcastReturnToLobby(lobby.getCode());
+        }
+        
+        res.json({
+            success: true,
+            message: 'Returning to lobby'
+        });
+    } catch (error) {
+        console.error('Error returning to lobby:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/game/:code/round/timeout
+router.post("/:code/round/timeout", (req, res) => {
+    try {
+        const { code } = req.params;
+        const { playerName } = req.body;
+        
+        const lobby = activeLobbies.get(code);
+        if (!lobby) {
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
+        }
+        
+        const currentRound = lobby.gameState.currentRound;
+        if (!currentRound) {
+            return res.status(404).json({ success: false, error: 'No active round' });
+        }
+        
+        if (currentRound.getRoundStatus() !== 'QP') {
+            return res.status(400).json({ success: false, error: 'Round is not in question period' });
+        }
+        
+        // Evaluate the round with current answers
+        const roundData = GameService.evaluateRound(lobby, currentRound);
+        
+        // Broadcast round results
+        if (req.app.locals.gameEvents) {
+            req.app.locals.gameEvents.broadcastRoundResults(lobby.getCode(), roundData);
+        }
+        
+        res.json({
+            success: true,
+            roundData: roundData
+        });
+    } catch (error) {
+        console.error('Error handling round timeout:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
