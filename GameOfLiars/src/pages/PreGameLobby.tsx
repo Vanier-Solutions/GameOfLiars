@@ -43,6 +43,11 @@ export default function PreGameLobby() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
+  // Name entry popup state
+  const [showNamePopup, setShowNamePopup] = useState(false);
+  const [tempPlayerName, setTempPlayerName] = useState('');
+  const [joiningLobby, setJoiningLobby] = useState(false);
+  
   // Kick confirmation modal state
   const [showKickModal, setShowKickModal] = useState(false);
   const [playerToKick, setPlayerToKick] = useState('');
@@ -91,7 +96,9 @@ export default function PreGameLobby() {
           setPlayerName(nameFromStorage);
           fetchLobbyData(code);
         } else {
-          setError('Player session not found. Please join the lobby again.');
+          // Show name entry popup instead of error
+          setShowNamePopup(true);
+          setLoading(false);
         }
         return;
       }
@@ -109,7 +116,9 @@ export default function PreGameLobby() {
           if (nameFromStorage) {
             setPlayerName(nameFromStorage);
           } else {
-            setError('Player not found in lobby. Please join the lobby again.');
+            // Show name entry popup instead of error
+            setShowNamePopup(true);
+            setLoading(false);
             return;
           }
         }
@@ -124,7 +133,9 @@ export default function PreGameLobby() {
           setPlayerName(nameFromStorage);
           fetchLobbyData(code);
         } else {
-          setError('Failed to load player information. Please join the lobby again.');
+          // Show name entry popup instead of error
+          setShowNamePopup(true);
+          setLoading(false);
         }
       }
     };
@@ -408,6 +419,69 @@ export default function PreGameLobby() {
     setPlayerToKick('');
   };
 
+  const handleJoinLobby = async () => {
+    if (!tempPlayerName.trim() || !code) return;
+    
+    // Validate name length
+    if (tempPlayerName.trim().length > 20) {
+      setError('Player name too long (max 20 characters)');
+      return;
+    }
+    
+    // Validate name contains only valid characters
+    if (!/^[a-zA-Z0-9\s]+$/.test(tempPlayerName.trim())) {
+      setError('Player name can only contain letters, numbers, and spaces');
+      return;
+    }
+    
+    try {
+      setJoiningLobby(true);
+      setError('');
+      
+      const response = await fetch(`${API_URL}/api/lobby/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: code,
+          playerName: tempPlayerName.trim()
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Store player info
+        localStorage.setItem('playerId', data.playerId);
+        localStorage.setItem('playerName', tempPlayerName.trim());
+        
+        // Set player name and close popup
+        setPlayerName(tempPlayerName.trim());
+        setShowNamePopup(false);
+        setTempPlayerName('');
+        
+        // Fetch lobby data
+        fetchLobbyData(code);
+      } else {
+        setError(data.error || 'Failed to join lobby');
+      }
+    } catch (err) {
+      console.error('Failed to join lobby:', err);
+      setError('Failed to join lobby');
+    } finally {
+      setJoiningLobby(false);
+    }
+  };
+
+  const handleCancelJoin = () => {
+    setShowNamePopup(false);
+    setTempPlayerName('');
+    setError('');
+    // Redirect to home page
+    window.location.href = '/';
+  };
+
   // Check if current player is on a team
   const getCurrentPlayerTeam = () => {
     if (lobbyData.teams.red.captain?.name === playerName) return { team: 'red', role: 'captain' };
@@ -426,6 +500,57 @@ export default function PreGameLobby() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-700">Loading lobby...</h2>
           <p className="text-gray-500 mt-2">Connecting to server...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show name popup if user hasn't joined yet
+  if (showNamePopup) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+          <h3 className="text-lg font-medium text-gray-900">Enter Your Name</h3>
+          <div className="mt-2">
+            <p className="text-sm text-gray-500">
+              Please enter your name to join the lobby.
+            </p>
+          </div>
+          {error && (
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+          <div className="mt-4">
+            <Input
+              type="text"
+              placeholder="Your Name"
+              value={tempPlayerName}
+              onChange={(e) => setTempPlayerName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && tempPlayerName.trim()) {
+                  handleJoinLobby();
+                }
+              }}
+              className="h-9"
+              autoFocus
+            />
+          </div>
+          <div className="mt-4 flex justify-end space-x-2">
+            <Button
+              onClick={handleJoinLobby}
+              disabled={!tempPlayerName.trim() || joiningLobby}
+              className="h-9 bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:bg-blue-300 disabled:text-blue-500"
+            >
+              {joiningLobby ? 'Joining...' : 'Join Lobby'}
+            </Button>
+            <Button
+              onClick={handleCancelJoin}
+              className="h-9 bg-gray-200 text-gray-800 font-medium"
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       </div>
     );
