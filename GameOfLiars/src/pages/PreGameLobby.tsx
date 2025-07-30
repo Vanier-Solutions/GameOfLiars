@@ -267,6 +267,8 @@ export default function PreGameLobby() {
     try {
       setError('');
       
+      const playerId = localStorage.getItem('playerId');
+      
       const response = await fetch(`${API_URL}/api/player/team`, {
         method: 'PUT',
         headers: {
@@ -274,7 +276,7 @@ export default function PreGameLobby() {
         },
         body: JSON.stringify({ 
           code: lobbyCode,
-          playerName: playerName,
+          playerId: playerId,
           team: 'spectator'
         }),
       });
@@ -365,6 +367,12 @@ export default function PreGameLobby() {
     try {
       setError('');
       
+      const hostPlayerId = localStorage.getItem('playerId');
+      
+      console.log('Kicking player:', playerToKick);
+      console.log('Host player ID:', hostPlayerId);
+      console.log('Lobby code:', lobbyCode);
+      
       const response = await fetch(`${API_URL}/api/player/kick`, {
         method: 'POST',
         headers: {
@@ -372,12 +380,14 @@ export default function PreGameLobby() {
         },
         body: JSON.stringify({
           code: lobbyCode,
-          hostName: playerName,
+          hostPlayerId: hostPlayerId,
           playerToKick: playerToKick
         }),
       });
 
       const data = await response.json();
+      
+      console.log('Kick response:', data);
       
       if (!data.success) {
         setError(data.error || 'Failed to kick player');

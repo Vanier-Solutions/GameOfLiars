@@ -68,6 +68,13 @@ export function setupGameEvents(io, activeLobbies) {
         io.to(lobbyCode).emit('returnToLobby');
     }
     
+    function broadcastPlayerKicked(lobbyCode, kickedPlayerName, kickedPlayerId) {
+        io.to(lobbyCode).emit('playerKicked', {
+            kickedPlayer: kickedPlayerName,
+            kickedPlayerId: kickedPlayerId
+        });
+    }
+    
     return {
         broadcastGameStarted,
         broadcastRoundStarted,
@@ -79,6 +86,7 @@ export function setupGameEvents(io, activeLobbies) {
         broadcastTeamChat,
         broadcastTeamUpdate,
         broadcastSettingsUpdate,
-        broadcastReturnToLobby
+        broadcastReturnToLobby,
+        broadcastPlayerKicked
     };
 } 

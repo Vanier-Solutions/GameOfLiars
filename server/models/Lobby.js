@@ -65,9 +65,9 @@ export class Lobby {
     }
 
     removePlayerFromTeam(user) {
-        this.spectators = this.spectators.filter(p => p.name !== user.name);
-        this.blueTeam = this.blueTeam.filter(p => p.name !== user.name);
-        this.redTeam = this.redTeam.filter(p => p.name !== user.name);
+        this.spectators = this.spectators.filter(p => p.getName() !== user.getName());
+        this.blueTeam = this.blueTeam.filter(p => p.getName() !== user.getName());
+        this.redTeam = this.redTeam.filter(p => p.getName() !== user.getName());
         if (this.blueCaptain === user) {
             this.blueCaptain = null;
         }
@@ -163,9 +163,9 @@ export class Lobby {
     }
 
     getPlayerByName(name) {
-        return this.spectators.find(p => p.name === name) ||
-               this.blueTeam.find(p => p.name === name) ||
-               this.redTeam.find(p => p.name === name);
+        return this.spectators.find(p => p.getName() === name) ||
+               this.blueTeam.find(p => p.getName() === name) ||
+               this.redTeam.find(p => p.getName() === name);
     }
 
     getPlayerById(id) {
