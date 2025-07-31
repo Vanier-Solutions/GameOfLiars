@@ -140,10 +140,24 @@ router.get('/:code', optionalAuth, (req, res) => {
             return res.status(404).json({ error: 'Lobby not found' });
         }
 
-        // Only check player membership if user is authenticated
+        // Check if user is authenticated and not a member of the lobby
         if (req.user && !lobby.hasPlayerId(req.user.id)) {
             console.log('User not in lobby:', req.user.id);
-            return res.status(403).json({ error: 'You are not a player in this lobby' });
+            return res.status(403).json({ 
+                error: 'You are not a player in this lobby',
+                needsToJoin: true,
+                lobbyCode: code.toUpperCase()
+            });
+        }
+        
+        // If user is not authenticated, they need to join
+        if (!req.user) {
+            console.log('User not authenticated, needs to join lobby');
+            return res.status(403).json({ 
+                error: 'You need to join this lobby to view it',
+                needsToJoin: true,
+                lobbyCode: code.toUpperCase()
+            });
         }
         
         console.log('Sending lobby data for code:', code);
