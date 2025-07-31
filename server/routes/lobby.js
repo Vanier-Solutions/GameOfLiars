@@ -231,6 +231,8 @@ router.put('/:code/settings', (req, res) => {
             player = lobby.getPlayerByName(playerName);
         }
         
+        console.log(player);
+
         if (!player) {
             return res.status(404).json({ error: 'Player not found' });
         }
