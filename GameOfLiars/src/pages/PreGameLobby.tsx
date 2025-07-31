@@ -118,10 +118,6 @@ export default function PreGameLobby() {
           // Refresh lobby data when players join/leave
           fetchLobbyData(lobbyCode);
           break;
-        case 'playerKicked':
-          // Refresh lobby data when player is kicked
-          fetchLobbyData(lobbyCode);
-          break;
         case 'error':
           const errorData = lastMessage.data as any;
           setError(errorData?.message || 'Socket error occurred');

@@ -1,7 +1,7 @@
 import express from "express";
 import { Lobby } from "../models/Lobby.js";
 import { User } from "../models/User.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -123,19 +123,30 @@ router.post("/join", (req, res) => {
 });
 
 // GET /api/lobby/:code
-router.get('/:code', (req, res) => {
+router.get('/:code', optionalAuth, (req, res) => {
     try {
+        console.log('GET /api/lobby/:code - Request received');
+        console.log('Params:', req.params);
+        console.log('User:', req.user);
+        
         const { code } = req.params;
         const lobby = activeLobbies.get(code.toUpperCase());
         
+        console.log('Lobby found:', !!lobby);
+        console.log('Active lobbies:', Array.from(activeLobbies.keys()));
+        
         if (!lobby) {
+            console.log('Lobby not found for code:', code.toUpperCase());
             return res.status(404).json({ error: 'Lobby not found' });
         }
 
-        if (!lobby.hasPlayerId(req.user.id)) {
+        // Only check player membership if user is authenticated
+        if (req.user && !lobby.hasPlayerId(req.user.id)) {
+            console.log('User not in lobby:', req.user.id);
             return res.status(403).json({ error: 'You are not a player in this lobby' });
         }
         
+        console.log('Sending lobby data for code:', code);
         res.json({
             success: true,
             lobby: {
@@ -155,6 +166,7 @@ router.get('/:code', (req, res) => {
             }
         });
     } catch (error) {
+        console.error('Error getting lobby info:', error);
         res.status(500).json({ error: 'Failed to get lobby info' });
     }
 });
@@ -162,18 +174,29 @@ router.get('/:code', (req, res) => {
 // GET /api/lobby/:code/player/:playerId
 router.get('/:code/player/:playerId', (req, res) => {
     try {
+        console.log('GET /api/lobby/:code/player/:playerId - Request received');
+        console.log('Params:', req.params);
+        
         const { code, playerId } = req.params;
         const lobby = activeLobbies.get(code.toUpperCase());
         
+        console.log('Lobby found:', !!lobby);
+        console.log('Looking for playerId:', playerId);
+        
         if (!lobby) {
+            console.log('Lobby not found for code:', code.toUpperCase());
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
         const player = lobby.getPlayerById(playerId);
+        console.log('Player found:', !!player);
+        
         if (!player) {
+            console.log('Player not found for playerId:', playerId);
             return res.status(404).json({ success: false, error: 'Player not found' });
         }
         
+        console.log('Sending player data for:', player.getName());
         res.json({
             success: true,
             player: {
@@ -272,7 +295,14 @@ router.post('/kick', requireAuth, (req, res) => {
     if (!player) {
         return res.status(404).json({ error: 'Player not found' });
     }
-    lobby.removePlayer(player);
+    lobby.removePlayerFromTeam(player);
+    
+    // Broadcast kick event to all players in the lobby
+    const gameEvents = req.app.locals.gameEvents;
+    if (gameEvents) {
+        gameEvents.broadcastPlayerKicked(code.toUpperCase(), playerName, player.getId());
+    }
+    
     res.json({ success: true, message: 'Player kicked successfully' });
 });
 

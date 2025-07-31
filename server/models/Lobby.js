@@ -176,5 +176,9 @@ export class Lobby {
                this.redTeam.find(p => p.getId() === id);
     }
     
+    hasPlayerId(id) {
+        return this.getPlayerById(id) !== undefined;
+    }
+    
     
 } 

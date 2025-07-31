@@ -4,8 +4,9 @@ import { activeLobbies } from '../routes/lobby.js';
 export function setupSocket(server) {
     const io = new Server(server, {
         cors: {
-            origin: "*",
-            methods: ["GET", "POST"]
+            origin: "http://192.168.1.200:5173",
+            methods: ["GET", "POST"],
+            credentials: true
         }
     });
 

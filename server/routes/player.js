@@ -1,11 +1,12 @@
 import express from "express";
 import { User } from "../models/User.js";
 import { activeLobbies } from "./lobby.js";
+import { optionalAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
 // PUT /api/player/team
-router.put('/team', (req, res) => {
+router.put('/team', optionalAuth, (req, res) => {
     try {
         const { code, playerName, playerId, team, role } = req.body;
         
@@ -18,9 +19,11 @@ router.put('/team', (req, res) => {
             return res.status(400).json({ error: 'Cannot change teams during game' });
         }
         
-        // Find player by UUID first, then by name as fallback
+        // Find player by session first, then by UUID, then by name as fallback
         let player;
-        if (playerId) {
+        if (req.user && req.user.id) {
+            player = lobby.getPlayerById(req.user.id);
+        } else if (playerId) {
             player = lobby.getPlayerById(playerId);
         } else if (playerName) {
             player = lobby.getPlayerByName(playerName);
@@ -63,6 +66,7 @@ router.put('/team', (req, res) => {
             }
         });
     } catch (error) {
+        console.error('Error updating team assignment:', error);
         res.status(500).json({ error: 'Failed to update team assignment' });
     }
 });
