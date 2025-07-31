@@ -7,17 +7,18 @@ const connectDB = async () => {
     throw new Error('MongoDB URI not found in environment variables');
   }
 
-  let connectionUri = uri;
-  
-  // Ensure we're connecting to the 'gol' database
-  if (!uri.includes('/gol')) {
-    connectionUri = uri.replace('mongodb+srv://', 'mongodb+srv://').replace('?', '/gol?');
-  }
+  console.log('Original URI:', uri);
+
+  // Use the original URI and specify database name in options
+  const connectionUri = uri;
+
+  console.log('Final connection URI:', connectionUri);
 
   const options = {
     maxPoolSize: 10,
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
+    dbName: 'gol' // Explicitly specify the database name
   };
 
   let retries = 0;
@@ -27,6 +28,8 @@ const connectDB = async () => {
     try {
       await mongoose.connect(connectionUri, options);
       console.log("Successfully connected to MongoDB using Mongoose.");
+      console.log("Database URI:", connectionUri);
+      console.log("Connected to database:", mongoose.connection.db.databaseName);
       return;
     } catch (err) {
       retries++;

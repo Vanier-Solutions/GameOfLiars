@@ -31,7 +31,7 @@ const questionSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true,
-  collection: 'qs'  // Explicitly specify collection name
+  collection: 'qs'
 });
 
 export default mongoose.model('Question', questionSchema);

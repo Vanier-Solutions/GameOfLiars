@@ -5,13 +5,16 @@ const getRandomQuestion = async (lobbyCode) => {
     try {
         console.log('QuestionService: Starting to fetch random question for lobby:', lobbyCode);
         
+        // Check if database is connected
+        if (mongoose.connection.readyState !== 1) {
+            console.error('QuestionService: Database not connected. ReadyState:', mongoose.connection.readyState);
+            throw new Error('Database not connected');
+        }
+        
         const db = mongoose.connection.db;
         console.log('QuestionService: Database connection status:', mongoose.connection.readyState);
         console.log('QuestionService: Database name:', db?.databaseName);
         
-        const dbName = db.databaseName;
-        const collectionName = 'qs';
-
         const totalQuestions = await Question.countDocuments();
         console.log('QuestionService: Total questions in database:', totalQuestions);
         
@@ -20,12 +23,12 @@ const getRandomQuestion = async (lobbyCode) => {
             throw new Error('No questions found in database at all');
         }
 
-        // Get questions that haven't been used in this lobby
-        const usedQuestions = await Question.distinct('usedInLobbies', { usedInLobbies: lobbyCode });
-        console.log('QuestionService: Questions already used in this lobby:', usedQuestions.length);
-        
+        // Get all questions that haven't been used in this lobby
         const availableQuestions = await Question.find({ 
-            _id: { $nin: usedQuestions } 
+            $or: [
+                { usedInLobbies: { $exists: false } },
+                { usedInLobbies: { $ne: lobbyCode } }
+            ]
         });
         console.log('QuestionService: Available questions (not used in this lobby):', availableQuestions.length);
 
