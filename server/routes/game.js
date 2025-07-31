@@ -1,22 +1,22 @@
 ﻿import express from 'express';
 import { GameService } from '../services/GameService.js';
 import { activeLobbies } from './lobby.js';
+import { optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // POST /api/game/:code/start
-router.post("/:code/start", async (req, res) => {
+router.post("/:code/start", optionalAuth, async (req, res) => {
     try {
         const { code } = req.params;
-        const { playerId } = req.body;
         
         const lobby = activeLobbies.get(code);
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify host
-        const player = lobby.getPlayerById(playerId) || lobby.getPlayerByName(req.body.playerName);
+        // Verify host using session
+        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can start the game' });
         }
@@ -41,18 +41,17 @@ router.post("/:code/start", async (req, res) => {
 });
 
 // POST /api/game/:code/round/start - New endpoint for starting individual rounds
-router.post("/:code/round/start", async (req, res) => {
+router.post("/:code/round/start", optionalAuth, async (req, res) => {
     try {
         const { code } = req.params;
-        const { playerId } = req.body;
         
         const lobby = activeLobbies.get(code);
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify host
-        const player = lobby.getPlayerById(playerId) || lobby.getPlayerByName(req.body.playerName);
+        // Verify host using session
+        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can start rounds' });
         }
@@ -75,18 +74,18 @@ router.post("/:code/round/start", async (req, res) => {
 });
 
 // POST /api/game/:code/round/answer
-router.post("/:code/round/answer", (req, res) => {
+router.post("/:code/round/answer", optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
-        const { playerName, answer, isSteal } = req.body;
+        const { answer, isSteal } = req.body;
         
         const lobby = activeLobbies.get(code);
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Find player and verify they are a captain
-        const player = lobby.getPlayerByName(playerName);
+        // Find player using session
+        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
         if (!player) {
             return res.status(404).json({ success: false, error: 'Player not found' });
         }
@@ -131,18 +130,17 @@ router.post("/:code/round/answer", (req, res) => {
 });
 
 // POST /api/game/:code/round/next
-router.post("/:code/round/next", async (req, res) => {
+router.post("/:code/round/next", optionalAuth, async (req, res) => {
     try {
         const { code } = req.params;
-        const { playerId } = req.body;
         
         const lobby = activeLobbies.get(code);
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify host
-        const player = lobby.getPlayerById(playerId) || lobby.getPlayerByName(req.body.playerName);
+        // Verify host using session
+        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can start next round' });
         }
@@ -186,13 +184,21 @@ router.post("/:code/round/next", async (req, res) => {
 });
 
 // GET /api/game/:code/state
-router.get("/:code/state", (req, res) => {
+router.get("/:code/state", optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
         const lobby = activeLobbies.get(code);
         
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
+        }
+        
+        // Verify player is in lobby using session
+        if (req.user) {
+            const player = lobby.getPlayerById(req.user.id);
+            if (!player) {
+                return res.status(403).json({ success: false, error: 'You are not a player in this lobby' });
+            }
         }
         
         const gameState = lobby.getGameState();
@@ -226,18 +232,17 @@ router.get("/:code/state", (req, res) => {
 });
 
 // POST /api/game/:code/return-to-lobby
-router.post("/:code/return-to-lobby", (req, res) => {
+router.post("/:code/return-to-lobby", optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
-        const { playerId } = req.body;
         
         const lobby = activeLobbies.get(code);
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify host
-        const player = lobby.getPlayerById(playerId) || lobby.getPlayerByName(req.body.playerName);
+        // Verify host using session
+        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can return to lobby' });
         }
@@ -258,14 +263,19 @@ router.post("/:code/return-to-lobby", (req, res) => {
 });
 
 // POST /api/game/:code/round/timeout
-router.post("/:code/round/timeout", (req, res) => {
+router.post("/:code/round/timeout", optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
-        const { playerName } = req.body;
         
         const lobby = activeLobbies.get(code);
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
+        }
+        
+        // Verify host using session
+        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        if (!player || player.getName() !== lobby.getHost().getName()) {
+            return res.status(403).json({ success: false, error: 'Only the host can trigger round timeout' });
         }
         
         const currentRound = lobby.gameState.currentRound;
