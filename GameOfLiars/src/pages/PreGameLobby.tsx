@@ -258,17 +258,19 @@ export default function PreGameLobby() {
     try {
       setError('');
       
+      const playerId = localStorage.getItem('playerId'); // Keep this for now
+      
       const response = await fetch(`${API_URL}/api/lobby/${lobbyCode}/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Use session for auth
+        credentials: 'include', // Add session support
         body: JSON.stringify({
+          playerId: playerId, // Keep this until backend is updated
           rounds: settings.rounds,
           roundLimit: settings.roundLimit,
           maxScore: settings.maxScore
-          // Remove playerId - backend will get it from session
         }),
       });
 

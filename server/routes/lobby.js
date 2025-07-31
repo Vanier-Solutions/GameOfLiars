@@ -213,26 +213,19 @@ router.get('/:code/player/:playerId', (req, res) => {
 });
 
 
-router.put('/:code/settings', (req, res) => {
+router.put('/:code/settings', requireAuth, (req, res) => {
     try {
         const { code } = req.params;
-        const { rounds, roundLimit, maxScore, playerName, playerId } = req.body;
+        const { rounds, roundLimit, maxScore } = req.body;
         
         const lobby = activeLobbies.get(code.toUpperCase());
         if (!lobby) {
             return res.status(404).json({ error: 'Lobby not found' });
         }
         
-        // Find player by UUID first, then by name as fallback
-        let player;
-        if (playerId) {
-            player = lobby.getPlayerById(playerId);
-        } else if (playerName) {
-            player = lobby.getPlayerByName(playerName);
-        }
+        // Get player from session instead of request body
+        const player = lobby.getPlayerById(req.user.id);
         
-        console.log(player);
-
         if (!player) {
             return res.status(404).json({ error: 'Player not found' });
         }
