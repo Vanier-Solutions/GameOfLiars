@@ -92,7 +92,7 @@ router.post("/join", (req, res) => {
             newPlayer = new User(playerName);
             lobby.addPlayer(newPlayer);
         } catch (error) {
-            return res.status(400).json({ error: 'Failed to join lobby' });
+            return res.status(400).json({ error: 'Lobby Full/Couldnt add player' });
         }
 
         // Store user session
