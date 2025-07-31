@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 5051;
 
 // Middleware
 app.use(cors({
-  origin: "*", // Allow all origins for development
+  origin: "http://192.168.1.200:5173", // Allow all origins for development
   credentials: true
 }));
 
