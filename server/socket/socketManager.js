@@ -137,8 +137,8 @@ export function setupSocket(server) {
             }
             
             if (settings.roundLimit !== undefined) {
-                if (settings.roundLimit < 30 || settings.roundLimit > 300) {
-                    socket.emit('error', { message: 'Round limit must be between 30 and 300 seconds' });
+                if (settings.roundLimit < 15 || settings.roundLimit > 300) {
+                    socket.emit('error', { message: 'Round limit must be between 15 and 300 seconds' });
                     return;
                 }
                 lobby.setRoundLimit(settings.roundLimit);

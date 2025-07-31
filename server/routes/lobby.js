@@ -211,8 +211,8 @@ router.put('/:code/settings', (req, res) => {
         }
         
         if (roundLimit !== undefined) {
-            if (roundLimit < 30 || roundLimit > 300) {
-                return res.status(400).json({ error: 'Round limit must be between 30 and 300 seconds' });
+            if (roundLimit < 15 || roundLimit > 300) {
+                return res.status(400).json({ error: 'Round limit must be between 15 and 300 seconds' });
             }
             lobby.setRoundLimit(roundLimit);
         }
