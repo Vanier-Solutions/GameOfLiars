@@ -52,7 +52,9 @@ class SocketManager extends EventEmitter {
 
     try {
       console.log('Connecting to Socket.io server...');
-      this.socket = io(API_URL);
+      this.socket = io(API_URL, {
+        withCredentials: true // Add session support for socket connections
+      });
 
       this.socket.on('connect', () => {
         console.log('Socket.io connected');

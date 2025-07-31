@@ -82,65 +82,18 @@ export default function PreGameLobby() {
     // Set lobby code from URL params
     if (code) {
       setLobbyCode(code);
-    }
-
-    // Get playerId from localStorage
-    const playerId = localStorage.getItem('playerId');
-
-    // Fetch player information using UUID
-    const fetchPlayerInfo = async () => {
-      if (!code || !playerId) {
-        // If no playerId in localStorage, try to get player name from localStorage
-        const nameFromStorage = localStorage.getItem('playerName');
-        if (nameFromStorage && code) {
-          setPlayerName(nameFromStorage);
-          fetchLobbyData(code);
-        } else {
-          // Show name entry popup instead of error
-          setShowNamePopup(true);
-          setLoading(false);
-        }
-        return;
-      }
       
-      try {
-        const response = await fetch(`${API_URL}/api/lobby/${code}/player/${playerId}`);
-        const data = await response.json();
-        
-        if (data.success && data.player) {
-          setPlayerName(data.player.name);
-          localStorage.setItem('playerName', data.player.name);
-        } else {
-          // Fallback to localStorage if API fails
-          const nameFromStorage = localStorage.getItem('playerName');
-          if (nameFromStorage) {
-            setPlayerName(nameFromStorage);
-          } else {
-            // Show name entry popup instead of error
-            setShowNamePopup(true);
-            setLoading(false);
-            return;
-          }
-        }
-        
-        // Fetch initial lobby data
+      // Check if we have player name in localStorage
+      const nameFromStorage = localStorage.getItem('playerName');
+      if (nameFromStorage) {
+        setPlayerName(nameFromStorage);
         fetchLobbyData(code);
-      } catch (err) {
-        console.error('Failed to fetch player info:', err);
-        // Fallback to localStorage
-        const nameFromStorage = localStorage.getItem('playerName');
-        if (nameFromStorage && code) {
-          setPlayerName(nameFromStorage);
-          fetchLobbyData(code);
-        } else {
-          // Show name entry popup instead of error
-          setShowNamePopup(true);
-          setLoading(false);
-        }
+      } else {
+        // Show name entry popup
+        setShowNamePopup(true);
+        setLoading(false);
       }
-    };
-
-    fetchPlayerInfo();
+    }
   }, [code]);
 
   // Listen for Socket.io updates
@@ -192,7 +145,9 @@ export default function PreGameLobby() {
     if (!code) return;
     
     try {
-      const response = await fetch(`${API_URL}/api/lobby/${code}`);
+      const response = await fetch(`${API_URL}/api/lobby/${code}`, {
+        credentials: 'include' // Use session for auth
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -245,20 +200,19 @@ export default function PreGameLobby() {
 
   const handleJoinTeam = async (team: 'red' | 'blue', role: 'player' | 'captain') => {
     try {
-      setError(''); // Clear previous errors
-      
-      const playerId = localStorage.getItem('playerId');
+      setError('');
       
       const response = await fetch(`${API_URL}/api/player/team`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Use session for auth
         body: JSON.stringify({
           code: lobbyCode,
-          playerId: playerId,
           team: team,
           role: role
+          // Remove playerId - backend will get it from session
         }),
       });
 
@@ -267,7 +221,6 @@ export default function PreGameLobby() {
       if (!data.success) {
         setError(data.error || 'Failed to join team');
       }
-      // No need for success handling - Socket.io will update automatically
     } catch (err) {
       console.error('Failed to join team:', err);
       setError('Failed to join team');
@@ -278,24 +231,22 @@ export default function PreGameLobby() {
     try {
       setError('');
       
-      const playerId = localStorage.getItem('playerId');
-      
       const response = await fetch(`${API_URL}/api/player/team`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Use session for auth
         body: JSON.stringify({ 
           code: lobbyCode,
-          playerId: playerId,
           team: 'spectator'
+          // Remove playerId - backend will get it from session
         }),
       });
 
       const data = await response.json();
       
       if (data.success) {
-        // Refresh lobby data
         fetchLobbyData(lobbyCode);
       } else {
         setError(data.error || 'Failed to leave team');
@@ -311,18 +262,17 @@ export default function PreGameLobby() {
     try {
       setError('');
       
-      const playerId = localStorage.getItem('playerId');
-      
       const response = await fetch(`${API_URL}/api/lobby/${lobbyCode}/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Use session for auth
         body: JSON.stringify({
-          playerId: playerId,
           rounds: settings.rounds,
           roundLimit: settings.roundLimit,
           maxScore: settings.maxScore
+          // Remove playerId - backend will get it from session
         }),
       });
 
@@ -331,7 +281,6 @@ export default function PreGameLobby() {
       if (!data.success) {
         setError(data.error || 'Failed to update settings');
       }
-      // Settings will be broadcast via Socket.io automatically from the backend
     } catch (err) {
       console.error('Failed to update settings:', err);
       setError('Failed to update settings');
@@ -344,14 +293,13 @@ export default function PreGameLobby() {
     try {
       setError('');
       
-      const playerId = localStorage.getItem('playerId');
-      
       const response = await fetch(`${API_URL}/api/game/${lobbyCode}/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ playerId }),
+        credentials: 'include', // Use session for auth
+        body: JSON.stringify({})  // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();
@@ -378,34 +326,26 @@ export default function PreGameLobby() {
     try {
       setError('');
       
-      const hostPlayerId = localStorage.getItem('playerId');
-      
-      console.log('Kicking player:', playerToKick);
-      console.log('Host player ID:', hostPlayerId);
-      console.log('Lobby code:', lobbyCode);
-      
-      const response = await fetch(`${API_URL}/api/player/kick`, {
+      const response = await fetch(`${API_URL}/api/lobby/kick`, { // Fixed URL
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Use session for auth
         body: JSON.stringify({
           code: lobbyCode,
-          hostPlayerId: hostPlayerId,
-          playerToKick: playerToKick
+          playerName: playerToKick // Only send who to kick, not who is kicking
+          // Remove hostPlayerId - backend will get it from session
         }),
       });
 
       const data = await response.json();
-      
-      console.log('Kick response:', data);
       
       if (!data.success) {
         setError(data.error || 'Failed to kick player');
       } else {
         setShowKickModal(false);
         setPlayerToKick('');
-        // Refresh lobby data after successful kick
         fetchLobbyData(lobbyCode);
       }
     } catch (err) {
@@ -443,6 +383,7 @@ export default function PreGameLobby() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Add session support
         body: JSON.stringify({
           code: code,
           playerName: tempPlayerName.trim()
@@ -456,12 +397,10 @@ export default function PreGameLobby() {
         localStorage.setItem('playerId', data.playerId);
         localStorage.setItem('playerName', tempPlayerName.trim());
         
-        // Set player name and close popup
         setPlayerName(tempPlayerName.trim());
         setShowNamePopup(false);
         setTempPlayerName('');
         
-        // Fetch lobby data
         fetchLobbyData(code);
       } else {
         setError(data.error || 'Failed to join lobby');

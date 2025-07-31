@@ -1,6 +1,7 @@
 import express from "express";
 import { Lobby } from "../models/Lobby.js";
 import { User } from "../models/User.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -38,6 +39,13 @@ router.post("/create", (req, res) => {
         const lobby = new Lobby(code, host);
 
         activeLobbies.set(code, lobby);
+
+        // Store user session
+        req.session.user = {
+            id: host.getId(),
+            name: playerName,
+            lobbyCode: code
+        };
 
         res.status(201).json({
             success: true,
@@ -87,6 +95,13 @@ router.post("/join", (req, res) => {
             return res.status(400).json({ error: 'Failed to join lobby' });
         }
 
+        // Store user session
+        req.session.user = {
+            id: newPlayer.getId(),
+            name: playerName,
+            lobbyCode: actualCode.toUpperCase()
+        };
+
         // Broadcast team update
         const gameEvents = req.app.locals.gameEvents;
         if (gameEvents) {
@@ -115,6 +130,10 @@ router.get('/:code', (req, res) => {
         
         if (!lobby) {
             return res.status(404).json({ error: 'Lobby not found' });
+        }
+
+        if (!lobby.hasPlayerId(req.user.id)) {
+            return res.status(403).json({ error: 'You are not a player in this lobby' });
         }
         
         res.json({
@@ -239,5 +258,33 @@ router.put('/:code/settings', (req, res) => {
     }
 });
 
+// POST /api/lobby/kick
+router.post('/kick', requireAuth, (req, res) => {
+    const { code, playerName } = req.body;
+    const lobby = activeLobbies.get(code.toUpperCase());
+    if (!lobby) {
+        return res.status(404).json({ error: 'Lobby not found' });
+    }
+    if (lobby.getHost().getId() !== req.user.id) {
+        return res.status(403).json({ error: 'Only the host can kick players' });
+    }
+    const player = lobby.getPlayerByName(playerName);
+    if (!player) {
+        return res.status(404).json({ error: 'Player not found' });
+    }
+    lobby.removePlayer(player);
+    res.json({ success: true, message: 'Player kicked successfully' });
+});
+
+// POST /api/lobby/leave
+router.post('/leave', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Could not log out' });
+        }
+        res.clearCookie('connect.sid'); // Default session cookie name
+        res.json({ success: true, message: 'Logged out successfully' });
+    });
+});
 
 export default router;

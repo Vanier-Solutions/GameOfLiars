@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import session from 'express-session';
 import connectDB from './db/connection.js';
 import lobbyRoutes from './routes/lobby.js';
 import playerRoutes from './routes/player.js';
@@ -19,16 +20,25 @@ app.use(cors({
   origin: "*", // Allow all origins for development
   credentials: true
 }));
+
+if (!process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET is not set');
+}
+
+// Session middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    secure: false,
+    maxAge: 4 * 60 * 60 * 1000 // 4 hours
+  }
+}));
+
+
 app.use(express.json());
 
-// Add a simple health check route
-app.get('/', (req, res) => {
-  res.json({ 
-    status: 'Server is running', 
-    message: 'Game of Liars API Server',
-    timestamp: new Date().toISOString()
-  });
-});
 
 // Routes
 app.use('/api/lobby', lobbyRoutes);

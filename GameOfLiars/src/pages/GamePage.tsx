@@ -132,58 +132,18 @@ export default function GamePage() {
   const { isConnected, lastMessage, sendMessage } = useWebSocket(lobbyCode, playerName);
 
   useEffect(() => {
-    // Set lobby code from URL params
     if (code) {
       setLobbyCode(code);
-    }
-
-    // Get playerId from localStorage
-    const playerId = localStorage.getItem('playerId');
-
-    // Fetch player information using UUID
-    const fetchPlayerInfo = async () => {
-      if (!code || !playerId) {
-        const nameFromStorage = localStorage.getItem('playerName');
-        if (nameFromStorage && code) {
-          setPlayerName(nameFromStorage);
-          fetchGameData(code, nameFromStorage);
-        } else {
-          setError('Player session not found. Please join the lobby again.');
-        }
-        return;
-      }
       
-      try {
-        const response = await fetch(`${API_URL}/api/lobby/${code}/player/${playerId}`);
-        const data = await response.json();
-        
-        if (data.success && data.player) {
-          setPlayerName(data.player.name);
-          localStorage.setItem('playerName', data.player.name);
-        } else {
-          const nameFromStorage = localStorage.getItem('playerName');
-          if (nameFromStorage) {
-            setPlayerName(nameFromStorage);
-          } else {
-            setError('Player not found in game. Please rejoin the lobby.');
-            return;
-          }
-        }
-        
-        fetchGameData(code, data.success && data.player ? data.player.name : localStorage.getItem('playerName') || undefined);
-      } catch (err) {
-        console.error('Failed to fetch player info:', err);
-        const nameFromStorage = localStorage.getItem('playerName');
-        if (nameFromStorage && code) {
-          setPlayerName(nameFromStorage);
-          fetchGameData(code, nameFromStorage);
-        } else {
-          setError('Failed to load player information. Please rejoin the lobby.');
-        }
+      const nameFromStorage = localStorage.getItem('playerName');
+      if (nameFromStorage) {
+        setPlayerName(nameFromStorage);
+        fetchGameData(code, nameFromStorage);
+      } else {
+        setError('Player not found. Please rejoin the lobby.');
+        setLoading(false);
       }
-    };
-
-    fetchPlayerInfo();
+    }
   }, [code]);
 
   // Listen for Socket.io updates
@@ -322,9 +282,8 @@ export default function GamePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          playerName: playerName 
-        }),
+        credentials: 'include', // Use session for auth
+        body: JSON.stringify({}) // Remove playerName - backend will get it from session
       });
 
       const data = await response.json();
@@ -343,11 +302,15 @@ export default function GamePage() {
     
     try {
       // Fetch game state
-      const gameResponse = await fetch(`${API_URL}/api/game/${code}/state`);
+      const gameResponse = await fetch(`${API_URL}/api/game/${code}/state`, {
+        credentials: 'include' // Add session support
+      });
       const gameData = await gameResponse.json();
       
       // Fetch lobby data to get team information
-      const lobbyResponse = await fetch(`${API_URL}/api/lobby/${code}`);
+      const lobbyResponse = await fetch(`${API_URL}/api/lobby/${code}`, {
+        credentials: 'include' // Add session support
+      });
       const lobbyData = await lobbyResponse.json();
       
       if (gameData.success && lobbyData.success) {
@@ -440,7 +403,7 @@ export default function GamePage() {
       }
     } catch (err) {
       console.error('Failed to fetch game data:', err);
-      setError('Failed to connect to server');
+      setError('Failed to load game data');
       setLoading(false);
     }
   };
@@ -469,14 +432,13 @@ export default function GamePage() {
     try {
       setError('');
       
-      const playerId = localStorage.getItem('playerId');
-      
       const response = await fetch(`${API_URL}/api/game/${lobbyCode}/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ playerId }),
+        credentials: 'include', // Use session for auth
+        body: JSON.stringify({}) // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();
@@ -499,14 +461,13 @@ export default function GamePage() {
     try {
       setError('');
       
-      const playerId = localStorage.getItem('playerId');
-      
       const response = await fetch(`${API_URL}/api/game/${lobbyCode}/round/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ playerId }),
+        credentials: 'include', // Use session for auth
+        body: JSON.stringify({}) // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();
@@ -534,10 +495,11 @@ export default function GamePage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Use session for auth
         body: JSON.stringify({ 
-          playerName: playerName,
           answer: answerInput.trim(),
           isSteal: false
+          // Remove playerName - backend will get it from session
         }),
       });
 
@@ -566,10 +528,11 @@ export default function GamePage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Use session for auth
         body: JSON.stringify({ 
-          playerName: playerName,
           answer: '',
           isSteal: true
+          // Remove playerName - backend will get it from session
         }),
       });
 
@@ -600,14 +563,13 @@ export default function GamePage() {
     try {
       setError('');
       
-      const playerId = localStorage.getItem('playerId');
-      
       const response = await fetch(`${API_URL}/api/game/${lobbyCode}/round/next`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ playerId }),
+        credentials: 'include', // Use session for auth
+        body: JSON.stringify({}) // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();
@@ -644,14 +606,13 @@ export default function GamePage() {
     try {
       setError('');
       
-      const playerId = localStorage.getItem('playerId');
-      
       const response = await fetch(`${API_URL}/api/game/${lobbyCode}/return-to-lobby`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ playerId }),
+        credentials: 'include', // Use session for auth
+        body: JSON.stringify({}) // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();

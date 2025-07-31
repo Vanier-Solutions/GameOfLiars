@@ -17,6 +17,7 @@ export class Lobby {
             maxScore: 10
         };
 
+        this.allPlayerIds = [this.host.getId()];
         this.spectators = [this.host];
 
         this.blueTeam = [];
@@ -41,6 +42,7 @@ export class Lobby {
         }
         
         this.spectators.push(user);
+        this.allPlayerIds.push(user.getId());
     }
 
 

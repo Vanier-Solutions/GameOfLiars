@@ -30,6 +30,7 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Add session support
         body: JSON.stringify({ playerName: playerName.trim() }),
       });
 
@@ -71,6 +72,7 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Add session support
         body: JSON.stringify({
           playerName: playerName.trim(),
           lobbyCode: lobbyCode.trim().toUpperCase()
@@ -94,7 +96,7 @@ export default function HomePage() {
         setError(data.error || 'Failed to join lobby');
       }
     } catch (error) {
-      setError('Failed to join lobby');
+      setError('Network error occurred');
     } finally {
       setIsJoining(false);
     }
