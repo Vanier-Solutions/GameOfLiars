@@ -52,7 +52,7 @@ export class GameService {
         const roundNumber = lobby.gameState.currentRoundNumber;
         
         try {
-            const questionData = await QuestionService.getRandomQuestion(lobby.getCode());
+            const questionData = await QuestionService(lobby.getCode());
             const newRound = new Round(roundNumber, questionData.question, questionData.correctAnswer);
             
             lobby.gameState.currentRound = newRound;
@@ -209,6 +209,11 @@ export class GameService {
                     winner = 'tie';
                 }
             }
+        } else {
+            // Neither team answered - no points awarded
+            bluePoints = 0;
+            redPoints = 0;
+            winner = 'tie';
         }
         
         // Apply points (negative points are capped at 0)

@@ -6,10 +6,8 @@ export class Round {
         this.correctAnswer = correctAnswer;
         this.roundStatus = 'NS'; // NS = Not Started, QP = Question Period, QR = Question Reveal
         this.roundStartTime = null;
-        this.teamAnswers = {
-            blue: null,
-            red: null
-        };
+        this.blueTeamAnswer = null;
+        this.redTeamAnswer = null;
         this.captainReady = {
             blue: false,
             red: false
@@ -41,9 +39,9 @@ export class Round {
 
     setCaptainReady(team, ready) {
         if (team === "blue") {
-            this.blueCaptainReady = ready;
+            this.captainReady.blue = ready;
         } else if (team === "red") {
-            this.redCaptainReady = ready;
+            this.captainReady.red = ready;
         }
     }
 
@@ -78,9 +76,9 @@ export class Round {
     
     getCaptainReady(team) {
         if (team === "blue") {
-            return this.blueCaptainReady;
+            return this.captainReady.blue;
         } else if (team === "red") {
-            return this.redCaptainReady;
+            return this.captainReady.red;
         }
     }
 }
