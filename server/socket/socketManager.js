@@ -24,11 +24,19 @@ export function setupSocket(server) {
     });
 
     io.on('connection', (socket) => {
-        console.log('User connected:', socket.id);
+        // Handle disconnect
+        socket.on('disconnect', () => {
+            if (socket.lobbyCode) {
+                socket.to(socket.lobbyCode).emit('playerLeft', {
+                    playerName: socket.playerName
+                });
+            }
+        });
 
         // Join lobby room
         socket.on('joinLobby', (data) => {
             const { code, playerName } = data;
+            
             const lobby = activeLobbies.get(code.toUpperCase());
             
             if (!lobby) {
@@ -42,6 +50,11 @@ export function setupSocket(server) {
                 return;
             }
 
+            // Leave any previous lobby room
+            if (socket.lobbyCode && socket.lobbyCode !== code.toUpperCase()) {
+                socket.leave(socket.lobbyCode);
+            }
+
             // Join the lobby room
             socket.join(code.toUpperCase());
             socket.lobbyCode = code.toUpperCase();
@@ -53,8 +66,6 @@ export function setupSocket(server) {
                 team: player.getTeam(),
                 role: player.getRole()
             });
-
-            console.log(`${playerName} joined lobby ${code}`);
         });
 
         // Leave lobby room
@@ -64,7 +75,6 @@ export function setupSocket(server) {
                 socket.to(socket.lobbyCode).emit('playerLeft', {
                     playerName: socket.playerName
                 });
-                console.log(`${socket.playerName} left lobby ${socket.lobbyCode}`);
             }
         });
 
@@ -168,16 +178,6 @@ export function setupSocket(server) {
 
             // Broadcast settings update to all players in the lobby
             io.to(socket.lobbyCode).emit('settingsUpdate', lobby.getSettings());
-        });
-
-        // Disconnect handling
-        socket.on('disconnect', () => {
-            if (socket.lobbyCode) {
-                socket.to(socket.lobbyCode).emit('playerDisconnected', {
-                    playerName: socket.playerName
-                });
-                console.log(`${socket.playerName} disconnected from lobby ${socket.lobbyCode}`);
-            }
         });
     });
 

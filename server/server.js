@@ -87,21 +87,34 @@ app.use((req, res) => {
 // Connect to MongoDB
 connectDB();
 
-// Start server
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is listening on port ${PORT}`);
-  console.log(`Local access: http://localhost:${PORT}`);
-  
-  // Use environment variable for network access or default to localhost
-  const networkUrl = process.env.NETWORK_URL || `http://localhost:${PORT}`;
-  console.log(`Network access: ${networkUrl}`);
-});
-
 // Setup Socket.io
-const io = setupSocket(server);
+const io = setupSocket(app);
 
 // Setup game events and make them available to routes
 const gameEvents = setupGameEvents(io, activeLobbies);
 app.locals.gameEvents = gameEvents;
 
-console.log('Server setup complete');
+// Start server
+app.listen(PORT, () => {
+    console.log(`Server is listening on port ${PORT}`);
+    console.log(`Local access: http://localhost:${PORT}`);
+    
+    // Get network IP for external access
+    const os = require('os');
+    const networkInterfaces = os.networkInterfaces();
+    let networkUrl = '';
+    
+    for (const name of Object.keys(networkInterfaces)) {
+        for (const net of networkInterfaces[name]) {
+            if (net.family === 'IPv4' && !net.internal) {
+                networkUrl = `http://${net.address}:${PORT}`;
+                break;
+            }
+        }
+        if (networkUrl) break;
+    }
+    
+    if (networkUrl) {
+        console.log(`Network access: ${networkUrl}`);
+    }
+});

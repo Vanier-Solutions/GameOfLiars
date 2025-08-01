@@ -36,8 +36,16 @@ interface LobbyData {
   gamePhase: string;
 }
 
+interface ChatMessage {
+  id: string;
+  playerName: string;
+  message: string;
+  timestamp: Date;
+}
+
 export default function PreGameLobby() {
   const { code } = useParams<{ code: string }>();
+  const navigate = useNavigate();
   const [playerName, setPlayerName] = useState('');
   const [lobbyCode, setLobbyCode] = useState('');
   const [loading, setLoading] = useState(true);
@@ -52,13 +60,16 @@ export default function PreGameLobby() {
   const [showKickModal, setShowKickModal] = useState(false);
   const [playerToKick, setPlayerToKick] = useState('');
   
+  // Add flag to prevent multiple session checks
+  const [sessionChecked, setSessionChecked] = useState(false);
+  
   const [lobbyData, setLobbyData] = useState<LobbyData>({
     code: '',
     host: '',
     settings: {
-      rounds: 7,
+      rounds: 10,
       roundLimit: 60,
-      maxScore: 10
+      maxScore: 7
     },
     teams: {
       red: {
@@ -75,19 +86,39 @@ export default function PreGameLobby() {
   const [isHost, setIsHost] = useState(false);
   const [settings, setSettings] = useState(lobbyData.settings);
 
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [messageInput, setMessageInput] = useState('');
+
   // Initialize Socket.io connection
   const { isConnected, lastMessage, sendMessage } = useWebSocket(lobbyCode, playerName);
 
   useEffect(() => {
     // Set lobby code from URL params
-    if (code) {
+    if (code && !sessionChecked) {
       setLobbyCode(code);
+      setSessionChecked(true); // Prevent multiple checks
+      
+      // Clear any old player data when accessing a new lobby
+      const currentLobbyCode = localStorage.getItem('lobbyCode');
+      if (currentLobbyCode && currentLobbyCode !== code) {
+        localStorage.removeItem('playerId');
+        localStorage.removeItem('playerName');
+        localStorage.removeItem('lobbyCode');
+      }
       
       // Check if we have a valid session by trying to fetch player info
       const checkSession = async () => {
-        try {
-          const playerId = localStorage.getItem('playerId');
-          if (playerId) {
+        if (!code || sessionChecked) return;
+        
+        setSessionChecked(true);
+        
+        const playerId = localStorage.getItem('playerId');
+        const storedPlayerName = localStorage.getItem('playerName');
+        
+        // If we have stored player data, try to verify the session
+        if (playerId && storedPlayerName) {
+          try {
             const response = await fetch(`${API_URL}/api/lobby/${code}/player/${playerId}`, {
               credentials: 'include'
             });
@@ -95,33 +126,65 @@ export default function PreGameLobby() {
             if (response.ok) {
               const data = await response.json();
               if (data.success) {
-                // Valid session exists, fetch lobby data
-                setPlayerName(data.player.name);
+                setPlayerName(storedPlayerName);
                 fetchLobbyData(code);
                 return;
               }
             }
+            
+            // Session check failed, try to join with stored name
+            const joinResponse = await fetch(`${API_URL}/api/lobby/join`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                code: code,
+                playerName: storedPlayerName
+              })
+            });
+            
+            if (joinResponse.ok) {
+              const joinData = await joinResponse.json();
+              if (joinData.success) {
+                localStorage.setItem('playerId', joinData.playerId);
+                localStorage.setItem('playerName', storedPlayerName);
+                localStorage.setItem('lobbyCode', code);
+                setPlayerName(storedPlayerName);
+                fetchLobbyData(code);
+                return;
+              }
+            }
+            
+            // Both session check and join failed, show name popup
+            setShowNamePopup(true);
+          } catch (error) {
+            setShowNamePopup(true);
           }
-          
-          // No valid session, show name entry popup
+        } else {
+          // No stored data, show name popup
           setShowNamePopup(true);
-          setLoading(false);
-        } catch (error) {
-          console.error('Error checking session:', error);
-          // Error checking session, show name entry popup
-          setShowNamePopup(true);
-          setLoading(false);
         }
       };
       
       checkSession();
     }
-  }, [code]);
+  }, [code, sessionChecked]);
 
   // Listen for Socket.io updates
   useEffect(() => {
     if (lastMessage) {
       switch (lastMessage.type) {
+        case 'gameChat':
+          const gameChatData = lastMessage.data as any;
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            playerName: gameChatData.playerName,
+            message: gameChatData.message,
+            timestamp: new Date()
+          }]);
+          break;
         case 'teamUpdate':
           // Refresh lobby data when teams change
           fetchLobbyData(lobbyCode);
@@ -166,6 +229,13 @@ export default function PreGameLobby() {
       const response = await fetch(`${API_URL}/api/lobby/${code}`, {
         credentials: 'include' // Use session for auth
       });
+      
+      if (response.status === 404) {
+        // Lobby doesn't exist, redirect to home
+        navigate('/');
+        return;
+      }
+      
       const data = await response.json();
       
       if (data.success) {
@@ -190,29 +260,20 @@ export default function PreGameLobby() {
                 .map((name: string) => ({ name }))
             }
           },
-          spectators: lobby.players.spectators.map((name: string) => ({ 
-            name, 
-            isHost: name === lobby.host 
-          }))
+          spectators: lobby.players.spectators.map((name: string) => ({ name }))
         });
         
-        setSettings({ ...lobby.settings, maxScore: lobby.settings.maxScore || 10 });
-        setLoading(false);
+        setSettings(lobby.settings);
         setError('');
-        
-        // Set host status after lobby data is set
-        if (playerName) {
-          const hostStatus = playerName === lobby.host;
-          setIsHost(hostStatus);
-        }
+        setLoading(false); // Add this line
       } else {
-        setError(data.error || 'Failed to load lobby');
-        setLoading(false);
+        setError(data.error || 'Failed to fetch lobby data');
+        setLoading(false); // Add this line
       }
-    } catch (err) {
-      console.error('Failed to fetch lobby data:', err);
-      setError('Failed to connect to server');
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching lobby data:', error);
+      setError('Failed to fetch lobby data');
+      setLoading(false); // Add this line
     }
   };
 
@@ -322,6 +383,12 @@ export default function PreGameLobby() {
         body: JSON.stringify({})  // Remove playerId - backend will get it from session
       });
 
+      if (response.status === 404) {
+        // Lobby doesn't exist, redirect to home
+        navigate('/');
+        return;
+      }
+
       const data = await response.json();
       
       if (!data.success) {
@@ -416,6 +483,7 @@ export default function PreGameLobby() {
         // Store player info
         localStorage.setItem('playerId', data.playerId);
         localStorage.setItem('playerName', tempPlayerName.trim());
+        localStorage.setItem('lobbyCode', code); // Store current lobby code
         
         setPlayerName(tempPlayerName.trim());
         setShowNamePopup(false);
@@ -439,6 +507,17 @@ export default function PreGameLobby() {
     setError('');
     // Redirect to home page
     window.location.href = '/';
+  };
+
+  const handleSendMessage = () => {
+    if (!messageInput.trim()) return;
+    
+    sendMessage('gameChat', {
+      playerName: playerName,
+      message: messageInput.trim()
+    });
+    
+    setMessageInput('');
   };
 
   // Check if current player is on a team
@@ -557,20 +636,20 @@ export default function PreGameLobby() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-200px)]">
           
           {/* Red Team */}
-          <div className="bg-white/80 border border-red-400 shadow-xl backdrop-blur-sm rounded-lg overflow-hidden">
-            <div className="bg-gradient-to-br from-red-600 via-red-500 to-red-700 px-6 py-6">
-              <h2 className="text-2xl text-white text-center font-bold tracking-wide drop-shadow-sm">Red Team</h2>
+          <div className="bg-white/80 border border-red-400 shadow-xl backdrop-blur-sm rounded-lg overflow-hidden flex flex-col">
+            <div className="bg-gradient-to-br from-red-600 via-red-500 to-red-700 px-4 py-4">
+              <h2 className="text-xl text-white text-center font-bold tracking-wide drop-shadow-sm">Red Team</h2>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-3 flex-1 overflow-y-auto">
               {/* Captain */}
               <div className="space-y-2">
                 <Label className="text-sm text-gray-600 font-medium">Captain</Label>
                 {lobbyData.teams.red.captain ? (
-                  <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                    <span className="font-medium text-red-800">
+                  <div className="flex items-center justify-between p-2 bg-red-50 rounded-lg border border-red-200">
+                    <span className="font-medium text-red-800 text-sm">
                       {lobbyData.teams.red.captain.name}
                       {lobbyData.teams.red.captain.name === playerName && ' (you)'}
                     </span>
@@ -578,20 +657,21 @@ export default function PreGameLobby() {
                       {isHost && lobbyData.teams.red.captain.name !== playerName && (
                         <button
                           onClick={() => handleKickPlayer(lobbyData.teams.red.captain!.name)}
-                          className="text-red-600 hover:text-red-800 text-sm font-medium px-2 py-1 rounded hover:bg-red-100 transition-colors"
+                          className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors"
                           title="Kick player"
                         >
                           ✕
                         </button>
                       )}
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                     </div>
                   </div>
                 ) : (
                   <Button
                     onClick={() => handleJoinTeam('red', 'captain')}
                     variant="outline"
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                    size="sm"
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50 text-sm"
                   >
                     Join as Captain
                   </Button>
@@ -601,10 +681,10 @@ export default function PreGameLobby() {
               {/* Players */}
               <div className="space-y-2">
                 <Label className="text-sm text-gray-600 font-medium">Players</Label>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {lobbyData.teams.red.players.map((player, index) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                      <span className="text-gray-800">
+                      <span className="text-gray-800 text-sm">
                         {player.name}
                         {player.name === playerName && ' (you)'}
                       </span>
@@ -612,7 +692,7 @@ export default function PreGameLobby() {
                         {isHost && player.name !== playerName && (
                           <button
                             onClick={() => handleKickPlayer(player.name)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium px-2 py-1 rounded hover:bg-red-100 transition-colors"
+                            className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors"
                             title="Kick player"
                           >
                             ✕
@@ -626,7 +706,7 @@ export default function PreGameLobby() {
                     onClick={() => handleJoinTeam('red', 'player')}
                     variant="outline"
                     size="sm"
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50 text-sm"
                   >
                     Join Team
                   </Button>
@@ -635,134 +715,194 @@ export default function PreGameLobby() {
             </div>
           </div>
 
-          {/* Center Column - Spectators & Settings */}
-          <div className="space-y-6">
+          {/* Center Column - Spectators, Settings, and Chat */}
+          <div className="lg:col-span-2 space-y-4 flex flex-col">
             
-            {/* Spectators */}
-            <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg text-gray-800 text-center">Spectators</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {lobbyData.spectators.map((spectator, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                      <span className="text-gray-800">
-                        {spectator.name} {spectator.name === playerName && '(you)'}
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        {spectator.isHost && (
-                          <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full font-medium">
-                            Host
-                          </span>
-                        )}
-                        {isHost && spectator.name !== playerName && (
-                          <button
-                            onClick={() => handleKickPlayer(spectator.name)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium px-2 py-1 rounded hover:bg-red-100 transition-colors"
-                            title="Kick player"
-                          >
-                            ✕
-                          </button>
-                        )}
-                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+            {/* Top Row - Spectators and Settings */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Spectators */}
+              <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base text-gray-800 text-center">Spectators</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {lobbyData.spectators.map((spectator, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <span className="text-gray-800 text-sm">
+                          {spectator.name} {spectator.name === playerName && '(you)'}
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          {spectator.isHost && (
+                            <span className="text-xs px-1 py-0.5 bg-yellow-100 text-yellow-800 rounded-full font-medium">
+                              Host
+                            </span>
+                          )}
+                          {isHost && spectator.name !== playerName && (
+                            <button
+                              onClick={() => handleKickPlayer(spectator.name)}
+                              className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors"
+                              title="Kick player"
+                            >
+                              ✕
+                            </button>
+                          )}
+                          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Game Settings */}
+              <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base text-gray-800 text-center">
+                    Game Settings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-gray-600">Rounds</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={settings.rounds}
+                        onChange={(e) => setSettings(prev => ({ ...prev, rounds: parseInt(e.target.value) }))}
+                        disabled={!isHost}
+                        className={`h-8 text-center text-sm ${!isHost ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-gray-600">Timer (sec)</Label>
+                      <Input
+                        type="number"
+                        min="30"
+                        max="300"
+                        value={settings.roundLimit}
+                        onChange={(e) => setSettings(prev => ({ ...prev, roundLimit: parseInt(e.target.value) }))}
+                        disabled={!isHost}
+                        className={`h-8 text-center text-sm ${!isHost ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-gray-600">Max Score</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={settings.maxScore}
+                        onChange={(e) => setSettings(prev => ({ ...prev, maxScore: parseInt(e.target.value) }))}
+                        disabled={!isHost}
+                        className={`h-8 text-center text-sm ${!isHost ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                    </div>
+                  </div>
+                  {isHost && (
+                    <Button 
+                      onClick={handleUpdateSettings}
+                      size="sm"
+                      className="w-full h-8 bg-gray-700 hover:bg-gray-600 text-white font-medium text-sm"
+                    >
+                      Update Settings
+                    </Button>
+                  )}
+                  {!isHost && (
+                    <p className="text-xs text-center text-gray-500">
+                      Only the host can change settings
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-            {/* Game Settings - Visible to all, editable by host only */}
-            <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg text-gray-800 text-center">
-                  Game Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-6">
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-sm text-gray-600">Rounds</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="20"
-                      value={settings.rounds}
-                      onChange={(e) => setSettings(prev => ({ ...prev, rounds: parseInt(e.target.value) }))}
-                      disabled={!isHost}
-                      className={`h-9 text-center ${!isHost ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm text-gray-600">Round Timer (sec)</Label>
-                    <Input
-                      type="number"
-                      min="30"
-                      max="300"
-                      value={settings.roundLimit}
-                      onChange={(e) => setSettings(prev => ({ ...prev, roundLimit: parseInt(e.target.value) }))}
-                      disabled={!isHost}
-                      className={`h-9 text-center ${!isHost ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm text-gray-600">Max Score</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={settings.maxScore}
-                      onChange={(e) => setSettings(prev => ({ ...prev, maxScore: parseInt(e.target.value) }))}
-                      disabled={!isHost}
-                      className={`h-9 text-center ${!isHost ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                    />
-                  </div>
-                </div>
-                {isHost && (
-                  <Button 
-                    onClick={handleUpdateSettings}
-                    className="w-full h-9 bg-gray-700 hover:bg-gray-600 text-white font-medium"
-                  >
-                    Update Settings
-                  </Button>
-                )}
-                {!isHost && (
-                  <p className="text-xs text-center text-gray-500">
-                    Only the host can change settings
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Start Game - Only visible to host */}
+            {/* Start Game Button */}
             {isHost && (
               <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm">
-                <CardContent className="pt-6">
+                <CardContent className="pt-4">
                   <Button
                     onClick={handleStartGame}
                     disabled={!canStartGame}
-                    className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white font-medium disabled:bg-gray-300 disabled:text-gray-500"
+                    className="w-full h-10 bg-gray-900 hover:bg-gray-800 text-white font-medium disabled:bg-gray-300 disabled:text-gray-500"
                   >
                     {canStartGame ? 'Start Game' : 'Need Captains for Both Teams'}
                   </Button>
                 </CardContent>
               </Card>
             )}
+
+            {/* Chat */}
+            <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm flex-1">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base text-gray-800 text-center">Lobby Chat</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-2 flex flex-col h-full">
+                {/* Chat Messages */}
+                <div className="flex-1 bg-gray-50 rounded-lg p-3 overflow-y-auto mb-3 min-h-0">
+                  <div className="space-y-1">
+                    {chatMessages.map((msg) => {
+                      const playerTeam = getCurrentPlayerTeam();
+                      const isRedTeam = lobbyData.teams.red.captain?.name === msg.playerName || 
+                                       lobbyData.teams.red.players.some(p => p.name === msg.playerName);
+                      const isBlueTeam = lobbyData.teams.blue.captain?.name === msg.playerName || 
+                                        lobbyData.teams.blue.players.some(p => p.name === msg.playerName);
+                      const isSpectator = lobbyData.spectators.some(p => p.name === msg.playerName);
+                      
+                      let nameColor = 'text-gray-700'; // Default for spectators
+                      if (isRedTeam) nameColor = 'text-red-600';
+                      else if (isBlueTeam) nameColor = 'text-blue-600';
+                      
+                      return (
+                        <div key={msg.id} className="text-sm">
+                          <span className={`font-medium ${nameColor}`}>{msg.playerName}:</span>
+                          <span className="text-gray-600 ml-2">{msg.message}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* Chat Input */}
+                <div className="flex space-x-2">
+                  <Input
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    placeholder="Type a message..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && messageInput.trim()) {
+                        handleSendMessage();
+                      }
+                    }}
+                    className="flex-1 h-8 text-sm"
+                  />
+                  <Button 
+                    onClick={handleSendMessage}
+                    disabled={!messageInput.trim()}
+                    size="sm"
+                    className="px-3 h-8"
+                  >
+                    Send
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Blue Team */}
-          <div className="bg-white/80 border border-blue-400 shadow-xl backdrop-blur-sm rounded-lg overflow-hidden">
-            <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 px-6 py-6">
-              <h2 className="text-2xl text-white text-center font-bold tracking-wide drop-shadow-sm">Blue Team</h2>
+          <div className="bg-white/80 border border-blue-400 shadow-xl backdrop-blur-sm rounded-lg overflow-hidden flex flex-col">
+            <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 px-4 py-4">
+              <h2 className="text-xl text-white text-center font-bold tracking-wide drop-shadow-sm">Blue Team</h2>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-3 flex-1 overflow-y-auto">
               {/* Captain */}
               <div className="space-y-2">
                 <Label className="text-sm text-gray-600 font-medium">Captain</Label>
                 {lobbyData.teams.blue.captain ? (
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="font-medium text-blue-800">
+                  <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="font-medium text-blue-800 text-sm">
                       {lobbyData.teams.blue.captain.name}
                       {lobbyData.teams.blue.captain.name === playerName && ' (you)'}
                     </span>
@@ -770,20 +910,21 @@ export default function PreGameLobby() {
                       {isHost && lobbyData.teams.blue.captain.name !== playerName && (
                         <button
                           onClick={() => handleKickPlayer(lobbyData.teams.blue.captain!.name)}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium px-2 py-1 rounded hover:bg-blue-100 transition-colors"
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium px-1 py-1 rounded hover:bg-blue-100 transition-colors"
                           title="Kick player"
                         >
                           ✕
                         </button>
                       )}
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     </div>
                   </div>
                 ) : (
                   <Button
                     onClick={() => handleJoinTeam('blue', 'captain')}
                     variant="outline"
-                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
+                    size="sm"
+                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 text-sm"
                   >
                     Join as Captain
                   </Button>
@@ -793,10 +934,10 @@ export default function PreGameLobby() {
               {/* Players */}
               <div className="space-y-2">
                 <Label className="text-sm text-gray-600 font-medium">Players</Label>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {lobbyData.teams.blue.players.map((player, index) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                      <span className="text-gray-800">
+                      <span className="text-gray-800 text-sm">
                         {player.name}
                         {player.name === playerName && ' (you)'}
                       </span>
@@ -804,7 +945,7 @@ export default function PreGameLobby() {
                         {isHost && player.name !== playerName && (
                           <button
                             onClick={() => handleKickPlayer(player.name)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium px-2 py-1 rounded hover:bg-blue-100 transition-colors"
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium px-1 py-1 rounded hover:bg-blue-100 transition-colors"
                             title="Kick player"
                           >
                             ✕
@@ -818,7 +959,7 @@ export default function PreGameLobby() {
                     onClick={() => handleJoinTeam('blue', 'player')}
                     variant="outline"
                     size="sm"
-                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
+                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 text-sm"
                   >
                     Join Team
                   </Button>

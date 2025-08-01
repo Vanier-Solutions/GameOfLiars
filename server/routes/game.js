@@ -17,6 +17,7 @@ router.post("/:code/start", optionalAuth, async (req, res) => {
         
         // Verify host using session
         const player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can start the game' });
         }
@@ -148,16 +149,12 @@ router.post("/:code/round/next", optionalAuth, async (req, res) => {
         const result = await GameService.nextRound(lobby);
         
         if (result.gameEnded) {
-            // Broadcast game ended event
-            if (req.app.locals.gameEvents) {
-                req.app.locals.gameEvents.broadcastGameEnded(lobby.getCode(), result);
-            }
-            
+            // Game has ended, but don't broadcast match summary yet
+            // Host will need to click "Match Summary" button
             res.json({
                 success: true,
                 gameEnded: true,
-                winner: result.winner,
-                finalScores: result.finalScores
+                message: 'Game has ended. Host can click "Match Summary" to see results.'
             });
         } else {
             // Broadcast next round event with round data
@@ -310,6 +307,70 @@ router.post("/:code/round/timeout", optionalAuth, (req, res) => {
         });
     } catch (error) {
         console.error('Error handling round timeout:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/game/:code/match-summary
+router.post("/:code/match-summary", optionalAuth, async (req, res) => {
+    try {
+        const { code } = req.params;
+        
+        const lobby = activeLobbies.get(code);
+        if (!lobby) {
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
+        }
+        
+        // Verify host using session
+        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        if (!player || player.getName() !== lobby.getHost().getName()) {
+            return res.status(403).json({ success: false, error: 'Only the host can show match summary' });
+        }
+        
+        // Check if game is actually ended
+        if (lobby.gamePhase !== 'ended') {
+            return res.status(400).json({ success: false, error: 'Game is not ended yet' });
+        }
+        
+        const gameState = lobby.getGameState();
+        const finalScores = gameState.scores;
+        
+        // Determine winner
+        let winner = null;
+        if (finalScores.blue > finalScores.red) {
+            winner = 'blue';
+        } else if (finalScores.red > finalScores.blue) {
+            winner = 'red';
+        } else {
+            winner = 'tie';
+        }
+        
+        const matchSummary = {
+            winner: winner,
+            finalScores: finalScores,
+            totalRounds: lobby.rounds.length,
+            rounds: lobby.rounds.map(round => ({
+                roundNumber: round.getRoundNumber(),
+                question: round.getQuestion(),
+                blueAnswer: round.getTeamAnswer('blue'),
+                redAnswer: round.getTeamAnswer('red'),
+                winner: round.getWinner(),
+                bluePoints: round.getTeamPoints('blue'),
+                redPoints: round.getTeamPoints('red')
+            }))
+        };
+        
+        // Broadcast match summary event
+        if (req.app.locals.gameEvents) {
+            req.app.locals.gameEvents.broadcastMatchSummary(lobby.getCode(), matchSummary);
+        }
+        
+        res.json({
+            success: true,
+            matchSummary: matchSummary
+        });
+    } catch (error) {
+        console.error('Error showing match summary:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

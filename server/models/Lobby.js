@@ -12,9 +12,10 @@ export class Lobby {
         this.code = code;
         this.gamePhase = "pregame"; // "pregame", "playing", "ended"
         this.settings = {
-            rounds: 7,
+            rounds: 10,
             roundLimit: 60,
-            maxScore: 10
+            maxScore: 7,
+            maxPlayers: 20 // Add missing maxPlayers setting
         };
 
         this.allPlayerIds = [this.host.getId()];
@@ -39,6 +40,12 @@ export class Lobby {
     addPlayer(user) {
         if (this.getTotalPlayers() >= this.settings.maxPlayers) {
             throw new Error("Lobby full");
+        }
+        
+        // Check if player already exists
+        const existingPlayer = this.getPlayerByName(user.getName());
+        if (existingPlayer) {
+            return; // Don't add duplicate
         }
         
         this.spectators.push(user);
@@ -178,6 +185,38 @@ export class Lobby {
     
     hasPlayerId(id) {
         return this.getPlayerById(id) !== undefined;
+    }
+    
+    // Remove a player completely from the lobby
+    removePlayer(player) {
+        // Remove from all teams
+        this.removePlayerFromTeam(player);
+        
+        // Remove from allPlayerIds
+        this.allPlayerIds = this.allPlayerIds.filter(id => id !== player.getId());
+    }
+    
+    // Check if lobby should be deleted (no players or only host)
+    shouldBeDeleted() {
+        // Don't delete lobbies that are in playing phase
+        if (this.gamePhase === 'playing' || this.gamePhase === 'ended') {
+            return false;
+        }
+        
+        const totalPlayers = this.getTotalPlayers();
+        
+        // If no players at all, delete
+        if (totalPlayers === 0) {
+            return true;
+        }
+        
+        // If only 1 player and that player is the host, delete
+        if (totalPlayers === 1) {
+            const hostPlayer = this.getPlayerByName(this.host.getName());
+            return hostPlayer !== undefined;
+        }
+        
+        return false;
     }
     
     

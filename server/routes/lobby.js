@@ -25,27 +25,26 @@ function generateLobbyCode() {
 // POST /api/lobby/create
 router.post("/create", (req, res) => {
     try {
-        console.log('Create lobby request received:', req.body);
-        
         const { playerName } = req.body;
         if (!playerName || playerName.trim().length === 0) {
-            console.log('Player name validation failed');
             return res.status(400).json({ error: 'Player name is required' });
         }
         
         if (playerName.length > 20) {
-            console.log('Player name too long');
             return res.status(400).json({ error: 'Player name too long (max 20 characters)' });
         }
 
         const code = generateLobbyCode();
-        console.log('Generated lobby code:', code);
+        
+        // Clean up any existing lobby with this code (shouldn't happen, but safety)
+        if (activeLobbies.has(code)) {
+            activeLobbies.delete(code);
+        }
         
         const host = new User(playerName, true);
         const lobby = new Lobby(code, host);
 
         activeLobbies.set(code, lobby);
-        console.log('Lobby created and stored:', code);
 
         // Store user session
         req.session.user = {
@@ -53,7 +52,6 @@ router.post("/create", (req, res) => {
             name: playerName,
             lobbyCode: code
         };
-        console.log('Session stored for user:', host.getId());
 
         const response = {
             success: true,
@@ -62,7 +60,6 @@ router.post("/create", (req, res) => {
             playerId: host.getId()
         };
         
-        console.log('Sending response:', response);
         res.status(201).json(response);
 
     } catch (error) {
@@ -76,11 +73,6 @@ router.post("/create", (req, res) => {
 
 // POST /api/lobby/join
 router.post("/join", (req, res) => {
-    console.log('=== POST /api/lobby/join route hit ===');
-    console.log('Method:', req.method);
-    console.log('URL:', req.url);
-    console.log('Body:', req.body);
-    
     try {
         const { code, lobbyCode, playerName } = req.body;
         const actualCode = code || lobbyCode; // Accept both parameter names
@@ -99,7 +91,9 @@ router.post("/join", (req, res) => {
         if (lobby.gamePhase !== 'pregame') {
             return res.status(400).json({ error: 'Game already in progress' });
         }
-        if (lobby.getPlayerByName(playerName)) {
+        
+        const existingPlayer = lobby.getPlayerByName(playerName);
+        if (existingPlayer) {
             return res.status(404).json({ error: 'Player name already taken' });
         }
 
@@ -130,7 +124,7 @@ router.post("/join", (req, res) => {
             playerId: newPlayer.getId()
         });
     } catch (error) {
-        console.log(error);
+        console.error('Error joining lobby:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to join lobby'
@@ -167,53 +161,74 @@ router.post('/kick', requireAuth, (req, res) => {
 router.post('/leave', (req, res) => {
     req.session.destroy((err) => {
         if (err) {
-            return res.status(500).json({ error: 'Could not log out' });
+            return res.status(500).json({ error: 'Could not leave lobby' });
         }
         res.clearCookie('connect.sid'); // Default session cookie name
-        res.json({ success: true, message: 'Logged out successfully' });
+        res.json({ success: true, message: 'Left lobby successfully' });
     });
+});
+
+// GET /api/lobby/:code/player/:playerId
+router.get('/:code/player/:playerId', (req, res) => {
+    try {
+        const { code, playerId } = req.params;
+        const lobby = activeLobbies.get(code.toUpperCase());
+        
+        if (!lobby) {
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
+        }
+        
+        const player = lobby.getPlayerById(playerId);
+        
+        if (!player) {
+            return res.status(404).json({ success: false, error: 'Player not found' });
+        }
+        
+        res.json({
+            success: true,
+            player: {
+                name: player.getName(),
+                team: player.getTeam(),
+                role: player.getRole(),
+                isHost: player.getName() === lobby.getHost().getName()
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching player info:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch player info' });
+    }
 });
 
 // GET /api/lobby/:code
 router.get('/:code', optionalAuth, (req, res) => {
     try {
-        console.log('GET /api/lobby/:code - Request received');
-        console.log('Params:', req.params);
-        console.log('User:', req.user);
-        
         const { code } = req.params;
-        const lobby = activeLobbies.get(code.toUpperCase());
         
-        console.log('Lobby found:', !!lobby);
-        console.log('Active lobbies:', Array.from(activeLobbies.keys()));
+        const lobby = activeLobbies.get(code);
         
         if (!lobby) {
-            console.log('Lobby not found for code:', code.toUpperCase());
             return res.status(404).json({ error: 'Lobby not found' });
         }
-
+        
         // Check if user is authenticated and not a member of the lobby
         if (req.user && !lobby.hasPlayerId(req.user.id)) {
-            console.log('User not in lobby:', req.user.id);
             return res.status(403).json({ 
                 error: 'You are not a player in this lobby',
                 needsToJoin: true,
-                lobbyCode: code.toUpperCase()
+                lobbyCode: code
             });
         }
         
         // If user is not authenticated, they need to join
         if (!req.user) {
-            console.log('User not authenticated, needs to join lobby');
             return res.status(403).json({ 
                 error: 'You need to join this lobby to view it',
                 needsToJoin: true,
-                lobbyCode: code.toUpperCase()
+                lobbyCode: code
             });
         }
         
-        console.log('Sending lobby data for code:', code);
-        res.json({
+        const response = {
             success: true,
             lobby: {
                 code: lobby.getCode(),
@@ -230,51 +245,12 @@ router.get('/:code', optionalAuth, (req, res) => {
                     red: lobby.getRedCaptain()?.getName() || null
                 }
             }
-        });
+        };
+        
+        res.json(response);
     } catch (error) {
         console.error('Error getting lobby info:', error);
         res.status(500).json({ error: 'Failed to get lobby info' });
-    }
-});
-
-// GET /api/lobby/:code/player/:playerId
-router.get('/:code/player/:playerId', (req, res) => {
-    try {
-        console.log('GET /api/lobby/:code/player/:playerId - Request received');
-        console.log('Params:', req.params);
-        
-        const { code, playerId } = req.params;
-        const lobby = activeLobbies.get(code.toUpperCase());
-        
-        console.log('Lobby found:', !!lobby);
-        console.log('Looking for playerId:', playerId);
-        
-        if (!lobby) {
-            console.log('Lobby not found for code:', code.toUpperCase());
-            return res.status(404).json({ success: false, error: 'Lobby not found' });
-        }
-        
-        const player = lobby.getPlayerById(playerId);
-        console.log('Player found:', !!player);
-        
-        if (!player) {
-            console.log('Player not found for playerId:', playerId);
-            return res.status(404).json({ success: false, error: 'Player not found' });
-        }
-        
-        console.log('Sending player data for:', player.getName());
-        res.json({
-            success: true,
-            player: {
-                name: player.getName(),
-                team: player.getTeam(),
-                role: player.getRole(),
-                isHost: player.getName() === lobby.getHost().getName()
-            }
-        });
-    } catch (error) {
-        console.error('Error fetching player info:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch player info' });
     }
 });
 
@@ -340,6 +316,17 @@ router.put('/:code/settings', requireAuth, (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Failed to update settings' });
     }
+});
+
+// Debug route to clean up all lobbies (for testing)
+router.post('/debug/cleanup', (req, res) => {
+    for (const [code, lobby] of activeLobbies.entries()) {
+        // Lobby state logging removed
+    }
+    
+    activeLobbies.clear();
+    
+    res.json({ success: true, message: 'All lobbies cleared' });
 });
 
 export default router;

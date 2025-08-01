@@ -75,7 +75,9 @@ export default function GamePage() {
   
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [teamChatMessages, setTeamChatMessages] = useState<ChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
+  const [teamMessageInput, setTeamMessageInput] = useState('');
   const [chatMode, setChatMode] = useState<'game' | 'team'>('game');
   
   // Game state
@@ -91,6 +93,10 @@ export default function GamePage() {
   const [showRoundResults, setShowRoundResults] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
   const [allRoundsResults, setAllRoundsResults] = useState<RoundResults[]>([]);
+  
+  // Match summary state
+  const [matchSummary, setMatchSummary] = useState<any>(null);
+  const [showMatchSummary, setShowMatchSummary] = useState(false);
   
   // Toast notification state
   const [toastNotification, setToastNotification] = useState<{
@@ -161,7 +167,7 @@ export default function GamePage() {
           break;
         case 'teamChat':
           const teamChatData = lastMessage.data as any;
-          setChatMessages(prev => [...prev, {
+          setTeamChatMessages(prev => [...prev, {
             id: Date.now().toString(),
             playerName: teamChatData.playerName,
             message: teamChatData.message,
@@ -235,10 +241,12 @@ export default function GamePage() {
             isVisible: true,
             message: `Game Over! ${gameEndData.winner === 'blue' ? 'Blue' : 'Red'} team wins!`
           });
-          // Navigate to home after a delay
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 3000);
+          // Don't auto-redirect, let host show match summary
+          break;
+        case 'matchSummary':
+          const matchSummaryData = lastMessage.data as any;
+          setMatchSummary(matchSummaryData);
+          setShowMatchSummary(true);
           break;
         case 'gameStarted':
           // Refresh game data when game starts
@@ -282,8 +290,7 @@ export default function GamePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Use session for auth
-        body: JSON.stringify({}) // Remove playerName - backend will get it from session
+        credentials: 'include' // Use session for auth
       });
 
       const data = await response.json();
@@ -426,6 +433,17 @@ export default function GamePage() {
     setMessageInput('');
   };
 
+  const handleSendTeamMessage = () => {
+    if (!teamMessageInput.trim()) return;
+    
+    sendMessage('teamChat', {
+      playerName: playerName,
+      message: teamMessageInput.trim()
+    });
+    
+    setTeamMessageInput('');
+  };
+
   const handleStartGame = async () => {
     if (!isHost) return;
     
@@ -550,16 +568,6 @@ export default function GamePage() {
   const handleNextRound = async () => {
     if (!isHost) return;
     
-    // Check if game has ended (max score or max rounds reached)
-    if (gameEnded || 
-        gameData.scores.blue >= gameData.settings.maxScore || 
-        gameData.scores.red >= gameData.settings.maxScore ||
-        gameData.currentRound >= gameData.settings.rounds) {
-      // Game has ended, redirect to lobby
-      window.location.href = '/';
-      return;
-    }
-    
     try {
       setError('');
       
@@ -617,15 +625,36 @@ export default function GamePage() {
 
       const data = await response.json();
       
-      if (data.success) {
-        // Redirect to lobby
-        window.location.href = `/lobby/${lobbyCode}`;
-      } else {
+      if (!data.success) {
         setError(data.error || 'Failed to return to lobby');
       }
     } catch (err) {
       console.error('Failed to return to lobby:', err);
       setError('Failed to return to lobby');
+    }
+  };
+
+  const handleMatchSummary = async () => {
+    try {
+      setError('');
+      
+      const response = await fetch(`${API_URL}/api/game/${lobbyCode}/match-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({})
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        setError(data.error || 'Failed to show match summary');
+      }
+    } catch (err) {
+      console.error('Failed to show match summary:', err);
+      setError('Failed to show match summary');
     }
   };
 
@@ -754,10 +783,10 @@ export default function GamePage() {
           </div>
 
           {/* Center Game Area */}
-          <div className="lg:col-span-3 space-y-2 lg:space-y-4 flex flex-col lg:min-h-0 order-3 lg:order-2">
+          <div className="lg:col-span-3 grid grid-rows-[1fr_auto] gap-2 lg:gap-4 lg:min-h-0 order-3 lg:order-2">
             
             {/* Game Status */}
-            <Card className="bg-white/90 shadow-xl backdrop-blur-sm">
+            <Card className="bg-white/90 shadow-xl backdrop-blur-sm overflow-y-auto">
               <CardContent className="p-4 lg:p-6 text-center">
                 <div className="space-y-2 lg:space-y-3">
                   <div className="text-xl lg:text-2xl font-light text-gray-700">
@@ -848,8 +877,8 @@ export default function GamePage() {
                     </div>
                   ) : roundStatus === 'QR' && showRoundResults && roundResults ? (
                     // Round results: Show answers and scores
-                    <div className="space-y-4">
-                      <div className="text-lg lg:text-xl font-bold text-gray-900 bg-gray-50 p-4 rounded-lg">
+                    <div className="space-y-2">
+                      <div className="text-base lg:text-lg font-bold text-gray-900 bg-gray-50 p-2 rounded-lg">
                         {(gameEnded || 
                           gameData.scores.blue >= gameData.settings.maxScore || 
                           gameData.scores.red >= gameData.settings.maxScore ||
@@ -857,25 +886,25 @@ export default function GamePage() {
                           'Match Results' : 'Round Results'}
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-blue-50 p-3 rounded-lg">
-                          <h3 className="font-bold text-blue-800 mb-2">Blue Team</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-blue-50 p-2 rounded-lg">
+                          <h3 className="font-bold text-blue-800 mb-1 text-xs">Blue Team</h3>
                           {(gameEnded || 
                             gameData.scores.blue >= gameData.settings.maxScore || 
                             gameData.scores.red >= gameData.settings.maxScore ||
                             gameData.currentRound >= gameData.settings.rounds) ? (
                             // Show all rounds for Blue team
-                            <div className="space-y-2">
+                            <div className="space-y-0.5 max-h-28 overflow-y-auto">
                               {allRoundsResults.map((result, index) => (
-                                <div key={index} className="text-xs border-b border-blue-200 pb-1">
-                                  <span className="font-medium">Round {index + 1}:</span>
-                                  <span className="ml-2">
+                                <div key={index} className="text-xs border-b border-blue-200 pb-0.5">
+                                  <span className="font-medium">R{index + 1}:</span>
+                                  <span className="ml-1">
                                     {result.blueAnswer?.isSteal ? 
                                       `STOLE${result.blueAnswer?.answer ? `: ${result.blueAnswer.answer}` : ''}` :
-                                      `Answer: ${result.blueAnswer?.answer || 'No answer'}`
+                                      `${result.blueAnswer?.answer || 'No answer'}`
                                     }
                                   </span>
-                                  <span className="ml-2 font-bold">
+                                  <span className="ml-1 font-bold">
                                     ({result.bluePoints > 0 ? '+' : ''}{result.bluePoints})
                                   </span>
                                 </div>
@@ -884,36 +913,36 @@ export default function GamePage() {
                           ) : (
                             // Show current round for Blue team
                             <>
-                              <p className="text-sm">
+                              <p className="text-xs">
                                 {roundResults.blueAnswer?.isSteal ? 
                                   `STOLE${roundResults.blueAnswer?.answer ? `: ${roundResults.blueAnswer.answer}` : ''}` :
-                                  `Answer: ${roundResults.blueAnswer?.answer || 'No answer'}`
+                                  `${roundResults.blueAnswer?.answer || 'No answer'}`
                                 }
                               </p>
-                              <p className="text-sm font-bold">
+                              <p className="text-xs font-bold">
                                 Points: {roundResults.bluePoints > 0 ? '+' : ''}{roundResults.bluePoints}
                               </p>
                             </>
                           )}
                         </div>
-                        <div className="bg-red-50 p-3 rounded-lg">
-                          <h3 className="font-bold text-red-800 mb-2">Red Team</h3>
+                        <div className="bg-red-50 p-2 rounded-lg">
+                          <h3 className="font-bold text-red-800 mb-1 text-xs">Red Team</h3>
                           {(gameEnded || 
                             gameData.scores.blue >= gameData.settings.maxScore || 
                             gameData.scores.red >= gameData.settings.maxScore ||
                             gameData.currentRound >= gameData.settings.rounds) ? (
                             // Show all rounds for Red team
-                            <div className="space-y-2">
+                            <div className="space-y-0.5 max-h-28 overflow-y-auto">
                               {allRoundsResults.map((result, index) => (
-                                <div key={index} className="text-xs border-b border-red-200 pb-1">
-                                  <span className="font-medium">Round {index + 1}:</span>
-                                  <span className="ml-2">
+                                <div key={index} className="text-xs border-b border-red-200 pb-0.5">
+                                  <span className="font-medium">R{index + 1}:</span>
+                                  <span className="ml-1">
                                     {result.redAnswer?.isSteal ? 
                                       `STOLE${result.redAnswer?.answer ? `: ${result.redAnswer.answer}` : ''}` :
-                                      `Answer: ${result.redAnswer?.answer || 'No answer'}`
+                                      `${result.redAnswer?.answer || 'No answer'}`
                                     }
                                   </span>
-                                  <span className="ml-2 font-bold">
+                                  <span className="ml-1 font-bold">
                                     ({result.redPoints > 0 ? '+' : ''}{result.redPoints})
                                   </span>
                                 </div>
@@ -922,13 +951,13 @@ export default function GamePage() {
                           ) : (
                             // Show current round for Red team
                             <>
-                              <p className="text-sm">
+                              <p className="text-xs">
                                 {roundResults.redAnswer?.isSteal ? 
                                   `STOLE${roundResults.redAnswer?.answer ? `: ${roundResults.redAnswer.answer}` : ''}` :
-                                  `Answer: ${roundResults.redAnswer?.answer || 'No answer'}`
+                                  `${roundResults.redAnswer?.answer || 'No answer'}`
                                 }
                               </p>
-                              <p className="text-sm font-bold">
+                              <p className="text-xs font-bold">
                                 Points: {roundResults.redPoints > 0 ? '+' : ''}{roundResults.redPoints}
                               </p>
                             </>
@@ -936,9 +965,9 @@ export default function GamePage() {
                         </div>
                       </div>
                       
-                      <div className="bg-green-50 p-3 rounded-lg">
-                        <h3 className="font-bold text-green-800 mb-2">Correct Answer</h3>
-                        <p className="text-lg">{roundResults.correctAnswer}</p>
+                      <div className="bg-green-50 p-2 rounded-lg">
+                        <h3 className="font-bold text-green-800 mb-1 text-xs">Correct Answer</h3>
+                        <p className="text-xs">{roundResults.correctAnswer}</p>
                       </div>
                       
                       <div className="text-center">
@@ -947,18 +976,18 @@ export default function GamePage() {
                           gameData.scores.red >= gameData.settings.maxScore ||
                           gameData.currentRound >= gameData.settings.rounds) ? (
                           // Game ended - show winner
-                          <div className="text-lg font-bold">
+                          <div className="text-sm font-bold">
                             {gameData.scores.blue > gameData.scores.red ? (
                               <span className="text-blue-600">Blue Team Won!</span>
                             ) : gameData.scores.red > gameData.scores.blue ? (
                               <span className="text-red-600">Red Team Won!</span>
                             ) : (
-                              <span className="text-purple-600">It's a Tie!</span>
+                              <span className="text-amber-600">It's a Tie!</span>
                             )}
                           </div>
                         ) : (
                           // Round ended - show round winner
-                          <p className="text-lg font-bold">
+                          <p className="text-sm font-bold">
                             Winner: {roundResults.winner === 'blue' ? 'Blue Team' : 
                                      roundResults.winner === 'red' ? 'Red Team' : 'Tie'}
                           </p>
@@ -971,15 +1000,15 @@ export default function GamePage() {
                                    gameData.scores.blue >= gameData.settings.maxScore || 
                                    gameData.scores.red >= gameData.settings.maxScore ||
                                    gameData.currentRound >= gameData.settings.rounds) ? 
-                                   handleReturnToLobby : handleNextRound}
-                          className="mt-4 px-8 py-3 text-lg bg-green-600 hover:bg-green-700 text-white font-bold"
+                                   handleMatchSummary : handleNextRound}
+                          className="mt-1 px-4 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white font-bold"
                           disabled={false}
                         >
                           {(gameEnded || 
                             gameData.scores.blue >= gameData.settings.maxScore || 
                             gameData.scores.red >= gameData.settings.maxScore ||
                             gameData.currentRound >= gameData.settings.rounds) ? 
-                            'Return to Lobby' : 'Next Round'}
+                            'Match Summary' : 'Next Round'}
                         </Button>
                       )}
                     </div>
@@ -1001,7 +1030,7 @@ export default function GamePage() {
                         ) : gameData.scores.red > gameData.scores.blue ? (
                           <span className="text-red-600">Red Team Won the Game!</span>
                         ) : (
-                          <span className="text-purple-600">It's a Tie!</span>
+                          <span className="text-amber-600">It's a Tie!</span>
                         )}
                       </div>
                       
@@ -1014,11 +1043,89 @@ export default function GamePage() {
                         </div>
                       </div>
                       
-                      {/* Host return button */}
+                      {/* Host buttons */}
+                      {isHost && (
+                        <div className="mt-8 space-y-4">
+                          <Button
+                            onClick={handleMatchSummary}
+                            className="px-8 py-4 text-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                          >
+                            Show Match Summary
+                          </Button>
+                          <Button
+                            onClick={handleReturnToLobby}
+                            className="px-8 py-4 text-xl bg-green-600 hover:bg-green-700 text-white font-bold"
+                          >
+                            Return to Lobby
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {/* Non-host message */}
+                      {!isHost && (
+                        <div className="mt-8 text-gray-500">
+                          <p>Waiting for host to show match summary...</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : showMatchSummary && matchSummary ? (
+                    // Match Summary Screen
+                    <div className="space-y-6 text-center">
+                      <div className="text-2xl lg:text-3xl font-bold text-gray-900">
+                        Match Summary
+                      </div>
+                      
+                      {/* Final winner */}
+                      <div className="text-xl lg:text-2xl font-bold">
+                        {matchSummary.winner === 'blue' ? (
+                          <span className="text-blue-600">Blue Team Won!</span>
+                        ) : matchSummary.winner === 'red' ? (
+                          <span className="text-red-600">Red Team Won!</span>
+                        ) : (
+                          <span className="text-amber-600">It's a Tie!</span>
+                        )}
+                      </div>
+                      
+                      {/* Final scores */}
+                      <div className="text-lg lg:text-xl text-gray-600">
+                        <p>Final Score:</p>
+                        <div className="flex justify-center space-x-8 mt-2">
+                          <span className="text-blue-600 font-bold">{matchSummary.finalScores.blue} - Blue</span>
+                          <span className="text-red-600 font-bold">{matchSummary.finalScores.red} - Red</span>
+                        </div>
+                      </div>
+                      
+                      {/* Round-by-round breakdown */}
+                      <div className="mt-6 text-left max-h-96 overflow-y-auto">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Round Details:</h3>
+                        {matchSummary.rounds.map((round: any, index: number) => (
+                          <div key={index} className="mb-4 p-4 bg-gray-50 rounded-lg">
+                            <div className="font-bold text-gray-900">Round {round.roundNumber}</div>
+                            <div className="text-sm text-gray-600 mb-2">{round.question}</div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-blue-600 font-medium">Blue:</span> {round.blueAnswer?.answer || 'No answer'} 
+                                {round.blueAnswer?.isSteal && <span className="text-orange-600 ml-1">(Steal)</span>}
+                                <span className="ml-2 font-bold">{round.bluePoints > 0 ? '+' : ''}{round.bluePoints}</span>
+                              </div>
+                              <div>
+                                <span className="text-red-600 font-medium">Red:</span> {round.redAnswer?.answer || 'No answer'}
+                                {round.redAnswer?.isSteal && <span className="text-orange-600 ml-1">(Steal)</span>}
+                                <span className="ml-2 font-bold">{round.redPoints > 0 ? '+' : ''}{round.redPoints}</span>
+                              </div>
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">
+                              Correct: {round.correctAnswer} | Winner: {round.winner === 'blue' ? 'Blue' : round.winner === 'red' ? 'Red' : 'None'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Return to lobby button */}
                       {isHost && (
                         <div className="mt-8">
                           <Button
-                            onClick={() => window.location.href = '/'}
+                            onClick={handleReturnToLobby}
                             className="px-8 py-4 text-xl bg-green-600 hover:bg-green-700 text-white font-bold"
                           >
                             Return to Lobby
@@ -1051,56 +1158,115 @@ export default function GamePage() {
             </Card>
 
             {/* Chat */}
-            <Card className="bg-white/90 shadow-xl backdrop-blur-sm flex-1 lg:min-h-0">
+            <Card className="bg-white/90 shadow-xl backdrop-blur-sm h-48 lg:h-64">
               <CardContent className="p-3 lg:p-4 h-full flex flex-col">
                 <div className="flex items-center justify-between mb-2 lg:mb-3">
                   <h3 className="text-sm lg:text-base font-medium text-gray-900">Chat</h3>
-                  <div className="flex space-x-1 lg:space-x-2">
-                    <Button
-                      onClick={() => setChatMode('game')}
-                      variant={chatMode === 'game' ? 'default' : 'outline'}
-                      size="sm"
-                      className="px-2 lg:px-3 py-1 text-xs lg:text-sm"
-                    >
-                      Game Chat
-                    </Button>
-                    <Button
-                      onClick={() => setChatMode('team')}
-                      variant={chatMode === 'team' ? 'default' : 'outline'}
-                      size="sm"
-                      className="px-2 lg:px-3 py-1 text-xs lg:text-sm"
-                    >
-                      Team Chat
-                    </Button>
-                  </div>
                 </div>
                 
-                {/* Chat Messages */}
-                <div className="h-32 lg:flex-1 bg-gray-50 rounded-lg p-2 lg:p-3 overflow-y-auto lg:min-h-0 mb-2 lg:mb-3">
-                  <div className="space-y-1 lg:space-y-2">
-                    {chatMessages
-                      .filter(msg => chatMode === 'game' ? !msg.team : msg.team === getCurrentPlayerTeam())
-                      .map((msg) => (
-                        <div key={msg.id} className="text-xs lg:text-sm">
-                          <span className="font-medium text-gray-700">{msg.playerName}:</span>
-                          <span className="text-gray-600 ml-2">{msg.message}</span>
-                        </div>
-                      ))}
+                {/* Chat Layout - Side by Side */}
+                <div className="flex-1 flex gap-3 min-h-0">
+                  {/* Game Chat */}
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-gray-700">Game Chat</h4>
+                    </div>
+                    
+                    {/* Game Chat Messages */}
+                    <div className="flex-1 bg-gray-50 rounded-lg p-2 overflow-y-auto mb-2 min-h-0">
+                      <div className="space-y-1">
+                        {chatMessages.map((msg) => {
+                          // Determine team color for player name
+                          const isRedTeam = gameData.teams.red.captain?.name === msg.playerName || 
+                                           gameData.teams.red.players.some(p => p.name === msg.playerName);
+                          const isBlueTeam = gameData.teams.blue.captain?.name === msg.playerName || 
+                                            gameData.teams.blue.players.some(p => p.name === msg.playerName);
+                          
+                          let nameColor = 'text-gray-700'; // Default for spectators
+                          if (isRedTeam) nameColor = 'text-red-600';
+                          else if (isBlueTeam) nameColor = 'text-blue-600';
+                          
+                          return (
+                            <div key={msg.id} className="text-xs">
+                              <span className={`font-medium ${nameColor}`}>{msg.playerName}:</span>
+                              <span className="text-gray-600 ml-2">{msg.message}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Game Chat Input */}
+                    <div className="flex space-x-2">
+                      <Input
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        placeholder="Type a game message..."
+                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                        className="flex-1 text-xs h-8"
+                      />
+                      <Button 
+                        onClick={handleSendMessage}
+                        disabled={!messageInput.trim()}
+                        size="sm"
+                        className="px-2 h-8 text-xs"
+                      >
+                        Send
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                
-                {/* Chat Input */}
-                <div className="flex space-x-2">
-                  <Input
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    placeholder={`Type a ${chatMode} message...`}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className="flex-1 text-sm"
-                  />
-                  <Button onClick={handleSendMessage} className="px-3 lg:px-4 text-sm">
-                    Send
-                  </Button>
+
+                  {/* Team Chat */}
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-gray-700">Team Chat</h4>
+                    </div>
+                    
+                    {/* Team Chat Messages */}
+                    <div className="flex-1 bg-gray-50 rounded-lg p-2 overflow-y-auto mb-2 min-h-0">
+                      <div className="space-y-1">
+                        {teamChatMessages
+                          .filter(msg => msg.team === getCurrentPlayerTeam())
+                          .map((msg) => {
+                            // Determine team color for player name
+                            const isRedTeam = gameData.teams.red.captain?.name === msg.playerName || 
+                                             gameData.teams.red.players.some(p => p.name === msg.playerName);
+                            const isBlueTeam = gameData.teams.blue.captain?.name === msg.playerName || 
+                                              gameData.teams.blue.players.some(p => p.name === msg.playerName);
+                            
+                            let nameColor = 'text-gray-700'; // Default for spectators
+                            if (isRedTeam) nameColor = 'text-red-600';
+                            else if (isBlueTeam) nameColor = 'text-blue-600';
+                            
+                            return (
+                              <div key={msg.id} className="text-xs">
+                                <span className={`font-medium ${nameColor}`}>{msg.playerName}:</span>
+                                <span className="text-gray-600 ml-2">{msg.message}</span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                    
+                    {/* Team Chat Input */}
+                    <div className="flex space-x-2">
+                      <Input
+                        value={teamMessageInput}
+                        onChange={(e) => setTeamMessageInput(e.target.value)}
+                        placeholder="Type a team message..."
+                        onKeyPress={(e) => e.key === 'Enter' && handleSendTeamMessage()}
+                        className="flex-1 text-xs h-8"
+                      />
+                      <Button 
+                        onClick={handleSendTeamMessage}
+                        disabled={!teamMessageInput.trim()}
+                        size="sm"
+                        className="px-2 h-8 text-xs"
+                      >
+                        Send
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

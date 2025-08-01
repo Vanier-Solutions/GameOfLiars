@@ -1,3 +1,7 @@
+import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
+import { API_URL } from '../config/api';
+
 // Simple browser-compatible event emitter
 class EventEmitter {
   private events: { [key: string]: Function[] } = {};
@@ -25,9 +29,6 @@ interface WebSocketMessage {
   data: unknown;
 }
 
-import { io, Socket } from 'socket.io-client';
-import { API_URL } from '../config/api';
-
 class SocketManager extends EventEmitter {
   private socket: Socket | null = null;
   private isConnected = false;
@@ -51,13 +52,11 @@ class SocketManager extends EventEmitter {
     this.playerName = playerName;
 
     try {
-      console.log('Connecting to Socket.io server...');
       this.socket = io(API_URL, {
         withCredentials: true // Add session support for socket connections
       });
 
       this.socket.on('connect', () => {
-        console.log('Socket.io connected');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         this.emit('connected');
@@ -67,7 +66,6 @@ class SocketManager extends EventEmitter {
       });
 
       this.socket.on('disconnect', () => {
-        console.log('Socket.io disconnected');
         this.isConnected = false;
         this.emit('connectionChange', false);
       });
@@ -154,13 +152,18 @@ class SocketManager extends EventEmitter {
       this.emit('message', { type: 'gameEnded', data });
     });
 
+    this.socket.on('matchSummary', (data: unknown) => {
+      this.emit('message', { type: 'matchSummary', data });
+    });
+
     this.socket.on('returnToLobby', (data: unknown) => {
       this.emit('message', { type: 'returnToLobby', data });
     });
 
-    this.socket.on('error', (error: { message: string }) => {
-      console.error('Socket error:', error.message);
-      this.emit('message', { type: 'error', data: error });
+    this.socket.on('error', (error: any) => {
+      if (error.message?.includes('Lobby not found')) {
+        window.location.href = '/';
+      }
     });
   }
 

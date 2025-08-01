@@ -81,4 +81,27 @@ export class Round {
             return this.captainReady.red;
         }
     }
+    
+    getTeamPoints(team) {
+        // Calculate points based on winner and steal attempts
+        if (!this.winner) return 0;
+        
+        if (this.winner === team) {
+            // Team won the round
+            const teamAnswer = this.getTeamAnswer(team);
+            if (teamAnswer && teamAnswer.isSteal) {
+                return 2; // Steal attempt and won
+            } else {
+                return 1; // Normal win
+            }
+        } else {
+            // Team lost the round
+            const teamAnswer = this.getTeamAnswer(team);
+            if (teamAnswer && teamAnswer.isSteal) {
+                return -1; // Steal attempt and lost
+            } else {
+                return 0; // Normal loss
+            }
+        }
+    }
 }
