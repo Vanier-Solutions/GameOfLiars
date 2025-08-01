@@ -83,16 +83,38 @@ export default function PreGameLobby() {
     if (code) {
       setLobbyCode(code);
       
-      // Check if we have player name in localStorage
-      const nameFromStorage = localStorage.getItem('playerName');
-      if (nameFromStorage) {
-        setPlayerName(nameFromStorage);
-        fetchLobbyData(code);
-      } else {
-        // Show name entry popup
-        setShowNamePopup(true);
-        setLoading(false);
-      }
+      // Check if we have a valid session by trying to fetch player info
+      const checkSession = async () => {
+        try {
+          const playerId = localStorage.getItem('playerId');
+          if (playerId) {
+            const response = await fetch(`${API_URL}/api/lobby/${code}/player/${playerId}`, {
+              credentials: 'include'
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success) {
+                // Valid session exists, fetch lobby data
+                setPlayerName(data.player.name);
+                fetchLobbyData(code);
+                return;
+              }
+            }
+          }
+          
+          // No valid session, show name entry popup
+          setShowNamePopup(true);
+          setLoading(false);
+        } catch (error) {
+          console.error('Error checking session:', error);
+          // Error checking session, show name entry popup
+          setShowNamePopup(true);
+          setLoading(false);
+        }
+      };
+      
+      checkSession();
     }
   }, [code]);
 
