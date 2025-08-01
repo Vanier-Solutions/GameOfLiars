@@ -17,8 +17,28 @@ const PORT = process.env.PORT || 5051;
 
 // Middleware
 app.use(cors({
-  origin: "http://192.168.1.200:5173", // Allow all origins for development
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost and IP addresses for development
+    if (origin.includes('localhost') || 
+        origin.includes('127.0.0.1') || 
+        origin.includes('192.168.1.200') ||
+        origin.includes('172.16.90.208')) {
+      return callback(null, true);
+    }
+    
+    // Allow specific production domains if needed
+    // if (origin === 'https://yourdomain.com') {
+    //   return callback(null, true);
+    // }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 if (!process.env.SESSION_SECRET) {

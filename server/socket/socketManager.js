@@ -4,7 +4,20 @@ import { activeLobbies } from '../routes/lobby.js';
 export function setupSocket(server) {
     const io = new Server(server, {
         cors: {
-            origin: "http://192.168.1.200:5173",
+            origin: function (origin, callback) {
+                // Allow requests with no origin
+                if (!origin) return callback(null, true);
+                
+                // Allow localhost and IP addresses for development
+                if (origin.includes('localhost') || 
+                    origin.includes('127.0.0.1') || 
+                    origin.includes('192.168.1.200') ||
+                    origin.includes('172.16.90.208')) {
+                    return callback(null, true);
+                }
+                
+                callback(new Error('Not allowed by CORS'));
+            },
             methods: ["GET", "POST"],
             credentials: true
         }

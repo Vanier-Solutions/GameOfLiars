@@ -25,20 +25,27 @@ function generateLobbyCode() {
 // POST /api/lobby/create
 router.post("/create", (req, res) => {
     try {
+        console.log('Create lobby request received:', req.body);
+        
         const { playerName } = req.body;
         if (!playerName || playerName.trim().length === 0) {
+            console.log('Player name validation failed');
             return res.status(400).json({ error: 'Player name is required' });
         }
         
         if (playerName.length > 20) {
+            console.log('Player name too long');
             return res.status(400).json({ error: 'Player name too long (max 20 characters)' });
         }
 
         const code = generateLobbyCode();
+        console.log('Generated lobby code:', code);
+        
         const host = new User(playerName, true);
         const lobby = new Lobby(code, host);
 
         activeLobbies.set(code, lobby);
+        console.log('Lobby created and stored:', code);
 
         // Store user session
         req.session.user = {
@@ -46,16 +53,20 @@ router.post("/create", (req, res) => {
             name: playerName,
             lobbyCode: code
         };
+        console.log('Session stored for user:', host.getId());
 
-        res.status(201).json({
+        const response = {
             success: true,
             code: lobby.getCode(),
             settings: lobby.getSettings(),
             playerId: host.getId()
-        });
+        };
+        
+        console.log('Sending response:', response);
+        res.status(201).json(response);
 
     } catch (error) {
-        console.log(error);
+        console.error('Error creating lobby:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to create lobby'
@@ -65,6 +76,11 @@ router.post("/create", (req, res) => {
 
 // POST /api/lobby/join
 router.post("/join", (req, res) => {
+    console.log('=== POST /api/lobby/join route hit ===');
+    console.log('Method:', req.method);
+    console.log('URL:', req.url);
+    console.log('Body:', req.body);
+    
     try {
         const { code, lobbyCode, playerName } = req.body;
         const actualCode = code || lobbyCode; // Accept both parameter names
@@ -120,6 +136,42 @@ router.post("/join", (req, res) => {
             error: 'Failed to join lobby'
         });
     }
+});
+
+// POST /api/lobby/kick
+router.post('/kick', requireAuth, (req, res) => {
+    const { code, playerName } = req.body;
+    const lobby = activeLobbies.get(code.toUpperCase());
+    if (!lobby) {
+        return res.status(404).json({ error: 'Lobby not found' });
+    }
+    if (lobby.getHost().getId() !== req.user.id) {
+        return res.status(403).json({ error: 'Only the host can kick players' });
+    }
+    const player = lobby.getPlayerByName(playerName);
+    if (!player) {
+        return res.status(404).json({ error: 'Player not found' });
+    }
+    lobby.removePlayerFromTeam(player);
+    
+    // Broadcast kick event to all players in the lobby
+    const gameEvents = req.app.locals.gameEvents;
+    if (gameEvents) {
+        gameEvents.broadcastPlayerKicked(code.toUpperCase(), playerName, player.getId());
+    }
+    
+    res.json({ success: true, message: 'Player kicked successfully' });
+});
+
+// POST /api/lobby/leave
+router.post('/leave', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Could not log out' });
+        }
+        res.clearCookie('connect.sid'); // Default session cookie name
+        res.json({ success: true, message: 'Logged out successfully' });
+    });
 });
 
 // GET /api/lobby/:code
@@ -288,42 +340,6 @@ router.put('/:code/settings', requireAuth, (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Failed to update settings' });
     }
-});
-
-// POST /api/lobby/kick
-router.post('/kick', requireAuth, (req, res) => {
-    const { code, playerName } = req.body;
-    const lobby = activeLobbies.get(code.toUpperCase());
-    if (!lobby) {
-        return res.status(404).json({ error: 'Lobby not found' });
-    }
-    if (lobby.getHost().getId() !== req.user.id) {
-        return res.status(403).json({ error: 'Only the host can kick players' });
-    }
-    const player = lobby.getPlayerByName(playerName);
-    if (!player) {
-        return res.status(404).json({ error: 'Player not found' });
-    }
-    lobby.removePlayerFromTeam(player);
-    
-    // Broadcast kick event to all players in the lobby
-    const gameEvents = req.app.locals.gameEvents;
-    if (gameEvents) {
-        gameEvents.broadcastPlayerKicked(code.toUpperCase(), playerName, player.getId());
-    }
-    
-    res.json({ success: true, message: 'Player kicked successfully' });
-});
-
-// POST /api/lobby/leave
-router.post('/leave', (req, res) => {
-    req.session.destroy((err) => {
-        if (err) {
-            return res.status(500).json({ error: 'Could not log out' });
-        }
-        res.clearCookie('connect.sid'); // Default session cookie name
-        res.json({ success: true, message: 'Logged out successfully' });
-    });
 });
 
 export default router;

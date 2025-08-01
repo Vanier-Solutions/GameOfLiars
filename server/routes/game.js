@@ -247,6 +247,14 @@ router.post("/:code/return-to-lobby", optionalAuth, (req, res) => {
             return res.status(403).json({ success: false, error: 'Only the host can return to lobby' });
         }
         
+        // Reset lobby state back to pregame
+        lobby.setGamePhase('pregame');
+        lobby.setRoundNumber(0);
+        lobby.setScore('blue', 0);
+        lobby.setScore('red', 0);
+        lobby.gameState.currentRound = null;
+        lobby.rounds = [];
+        
         // Broadcast return to lobby event
         if (req.app.locals.gameEvents) {
             req.app.locals.gameEvents.broadcastReturnToLobby(lobby.getCode());
@@ -254,7 +262,8 @@ router.post("/:code/return-to-lobby", optionalAuth, (req, res) => {
         
         res.json({
             success: true,
-            message: 'Returning to lobby'
+            message: 'Returning to lobby',
+            gamePhase: lobby.gamePhase
         });
     } catch (error) {
         console.error('Error returning to lobby:', error);
