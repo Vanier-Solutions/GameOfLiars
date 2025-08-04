@@ -10,12 +10,21 @@ if (!uri) {
     process.exit(1);
 }
 
-// Connect to MongoDB
-const connectionUri = uri;
-
-mongoose.connect(connectionUri, {
-    dbName: 'gol'
-});
+// Connect to MongoDB function
+const connectDB = async () => {
+    try {
+        const connectionUri = uri;
+        
+        await mongoose.connect(connectionUri, {
+            dbName: 'gol'
+        });
+        
+        console.log("Successfully connected to MongoDB using Mongoose.");
+    } catch (error) {
+        console.error('MongoDB connection error:', error);
+        process.exit(1);
+    }
+};
 
 // Handle connection events
 mongoose.connection.on('connected', () => {
@@ -37,4 +46,4 @@ process.on('SIGINT', async () => {
     process.exit(0);
 });
 
-export default mongoose;
+export default connectDB;

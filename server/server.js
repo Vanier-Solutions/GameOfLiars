@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import session from 'express-session';
+import http from 'http';
+import os from 'os';
 import connectDB from './db/connection.js';
 import lobbyRoutes from './routes/lobby.js';
 import playerRoutes from './routes/player.js';
@@ -88,19 +90,19 @@ app.use((req, res) => {
 connectDB();
 
 // Setup Socket.io
-const io = setupSocket(app);
+const server = http.createServer(app);
+const io = setupSocket(server);
 
 // Setup game events and make them available to routes
 const gameEvents = setupGameEvents(io, activeLobbies);
 app.locals.gameEvents = gameEvents;
 
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server is listening on port ${PORT}`);
     console.log(`Local access: http://localhost:${PORT}`);
     
     // Get network IP for external access
-    const os = require('os');
     const networkInterfaces = os.networkInterfaces();
     let networkUrl = '';
     

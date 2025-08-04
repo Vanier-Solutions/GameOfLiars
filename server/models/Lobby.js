@@ -27,6 +27,7 @@ export class Lobby {
         this.redCaptain = null;
 
         this.rounds = [];
+        this.usedQuestions = []; // Track used question IDs
         this.gameState = {
             currentRoundNumber: 0,
             scores: {
@@ -217,6 +218,19 @@ export class Lobby {
         }
         
         return false;
+    }
+    
+    // Used questions tracking methods
+    getUsedQuestions() {
+        return this.usedQuestions;
+    }
+    
+    addUsedQuestion(questionId) {
+        this.usedQuestions.push(questionId);
+    }
+    
+    clearUsedQuestions() {
+        this.usedQuestions = [];
     }
     
     
