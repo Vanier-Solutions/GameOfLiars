@@ -1,5 +1,5 @@
 ﻿import { Round } from '../models/Round.js';
-import QuestionService from './QuestionService.js';
+import { QuestionService } from './QuestionService.js';
 
 export class GameService {
     
@@ -52,7 +52,8 @@ export class GameService {
         const roundNumber = lobby.gameState.currentRoundNumber;
         
         try {
-            const questionData = await QuestionService(lobby.getCode());
+            const questionService = new QuestionService(lobby.getCode());
+            const questionData = await questionService.getRandomQuestion();
             const newRound = new Round(roundNumber, questionData.question, questionData.correctAnswer);
             
             lobby.gameState.currentRound = newRound;

@@ -1,5 +1,6 @@
 ﻿import Question from '../db_models/Question.js';
 import mongoose from 'mongoose';
+import { activeLobbies } from '../routes/lobby.js';
 
 export class QuestionService {
     constructor(lobbyCode) {
