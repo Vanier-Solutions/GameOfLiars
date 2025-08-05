@@ -709,7 +709,7 @@ export default function GamePage() {
   }
 
   return (
-    <div className="min-h-screen lg:h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 lg:p-4 lg:overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 lg:p-4">
       {/* Toast Notification */}
       <ToastNotification
         message={toastNotification.message}
@@ -718,7 +718,7 @@ export default function GamePage() {
         duration={1000}
       />
       
-      <div className="max-w-8xl mx-auto h-full flex flex-col">
+      <div className="max-w-8xl mx-auto">
         
         {/* Game Header */}
         <div className="text-center mb-2 lg:mb-4">
@@ -739,11 +739,11 @@ export default function GamePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-2 lg:gap-4 flex-1 lg:min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-2 lg:gap-4">
           
           {/* Blue Team */}
           <div className="lg:col-span-1 order-1 lg:order-1">
-            <div className="bg-white/90 border-l-4 border-blue-500 shadow-xl backdrop-blur-sm rounded-lg overflow-hidden h-auto lg:h-full">
+            <div className="bg-white/90 border-l-4 border-blue-500 shadow-xl backdrop-blur-sm rounded-lg">
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-2">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base lg:text-lg text-white font-bold">Blue Team</h2>
@@ -753,7 +753,7 @@ export default function GamePage() {
                   </div>
                 </div>
               </div>
-              <div className="p-3 space-y-2 max-h-48 lg:h-auto lg:overflow-y-auto" style={{height: 'auto'}} data-lg-style={{height: 'calc(100% - 60px)'}}>
+              <div className="p-3 space-y-2">
                 {gameData.teams.blue.captain && (
                   <div className="p-2 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="flex items-center justify-between">
@@ -783,10 +783,10 @@ export default function GamePage() {
           </div>
 
           {/* Center Game Area */}
-          <div className="lg:col-span-3 grid grid-rows-[1fr_auto] gap-2 lg:gap-4 lg:min-h-0 order-3 lg:order-2">
+          <div className="lg:col-span-3 order-3 lg:order-2 space-y-2 lg:space-y-4">
             
             {/* Game Status */}
-            <Card className="bg-white/90 shadow-xl backdrop-blur-sm overflow-y-auto">
+            <Card className="bg-white/90 shadow-xl backdrop-blur-sm">
               <CardContent className="p-4 lg:p-6 text-center">
                 <div className="space-y-2 lg:space-y-3">
                   <div className="text-xl lg:text-2xl font-light text-gray-700">
@@ -1158,14 +1158,14 @@ export default function GamePage() {
             </Card>
 
             {/* Chat */}
-            <Card className="bg-white/90 shadow-xl backdrop-blur-sm h-48 lg:h-64">
-              <CardContent className="p-3 lg:p-4 h-full flex flex-col">
+            <Card className="bg-white/90 shadow-xl backdrop-blur-sm">
+              <CardContent className="p-3 lg:p-4">
                 <div className="flex items-center justify-between mb-2 lg:mb-3">
                   <h3 className="text-sm lg:text-base font-medium text-gray-900">Chat</h3>
                 </div>
                 
                 {/* Chat Layout - Side by Side */}
-                <div className="flex-1 flex gap-3 min-h-0">
+                <div className="flex flex-col lg:flex-row gap-3">
                   {/* Game Chat */}
                   <div className="flex-1 flex flex-col">
                     <div className="flex items-center justify-between mb-2">
@@ -1173,7 +1173,7 @@ export default function GamePage() {
                     </div>
                     
                     {/* Game Chat Messages */}
-                    <div className="flex-1 bg-gray-50 rounded-lg p-2 overflow-y-auto mb-2 min-h-0">
+                    <div className="bg-gray-50 rounded-lg p-2 overflow-y-auto mb-2 min-h-[120px] lg:min-h-[200px]">
                       <div className="space-y-1">
                         {chatMessages.map((msg) => {
                           // Determine team color for player name
@@ -1223,7 +1223,7 @@ export default function GamePage() {
                     </div>
                     
                     {/* Team Chat Messages */}
-                    <div className="flex-1 bg-gray-50 rounded-lg p-2 overflow-y-auto mb-2 min-h-0">
+                    <div className="bg-gray-50 rounded-lg p-2 overflow-y-auto mb-2 min-h-[120px] lg:min-h-[200px]">
                       <div className="space-y-1">
                         {teamChatMessages
                           .filter(msg => msg.team === getCurrentPlayerTeam())
@@ -1274,7 +1274,7 @@ export default function GamePage() {
 
           {/* Red Team */}
           <div className="lg:col-span-1 order-2 lg:order-3">
-            <div className="bg-white/90 border-r-4 border-red-500 shadow-xl backdrop-blur-sm rounded-lg overflow-hidden h-auto lg:h-full">
+            <div className="bg-white/90 border-r-4 border-red-500 shadow-xl backdrop-blur-sm rounded-lg">
               <div className="bg-gradient-to-r from-red-600 to-red-700 px-3 py-2">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base lg:text-lg text-white font-bold">Red Team</h2>
@@ -1284,7 +1284,7 @@ export default function GamePage() {
                   </div>
                 </div>
               </div>
-              <div className="p-3 space-y-2 max-h-48 lg:h-auto lg:overflow-y-auto" style={{height: 'auto'}} data-lg-style={{height: 'calc(100% - 60px)'}}>
+              <div className="p-3 space-y-2">
                 {gameData.teams.red.captain && (
                   <div className="p-2 bg-red-50 rounded-lg border border-red-200">
                     <div className="flex items-center justify-between">

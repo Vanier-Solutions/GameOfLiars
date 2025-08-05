@@ -636,14 +636,14 @@ export default function PreGameLobby() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-200px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           
           {/* Red Team */}
-          <div className="bg-white/80 border border-red-400 shadow-xl backdrop-blur-sm rounded-lg overflow-hidden flex flex-col">
+          <div className="bg-white/80 border border-red-400 shadow-xl backdrop-blur-sm rounded-lg">
             <div className="bg-gradient-to-br from-red-600 via-red-500 to-red-700 px-4 py-4">
               <h2 className="text-xl text-white text-center font-bold tracking-wide drop-shadow-sm">Red Team</h2>
             </div>
-            <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+            <div className="p-4 space-y-3">
               {/* Captain */}
               <div className="space-y-2">
                 <Label className="text-sm text-gray-600 font-medium">Captain</Label>
@@ -726,7 +726,7 @@ export default function PreGameLobby() {
                   <CardTitle className="text-base text-gray-800 text-center">Spectators</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-2">
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                  <div className="space-y-1">
                     {lobbyData.spectators.map((spectator, index) => (
                       <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                         <span className="text-gray-800 text-sm">
@@ -835,13 +835,13 @@ export default function PreGameLobby() {
             )}
 
             {/* Chat */}
-            <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm flex-1">
+            <Card className="bg-white/80 border-gray-200 shadow-xl backdrop-blur-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base text-gray-800 text-center">Lobby Chat</CardTitle>
               </CardHeader>
-              <CardContent className="pt-2 flex flex-col h-full">
+              <CardContent className="pt-2">
                 {/* Chat Messages */}
-                <div className="flex-1 bg-gray-50 rounded-lg p-3 overflow-y-auto mb-3 min-h-0">
+                <div className="bg-gray-50 rounded-lg p-3 overflow-y-auto mb-3 min-h-[200px]">
                   <div className="space-y-1">
                     {chatMessages.map((msg) => {
                       const playerTeam = getCurrentPlayerTeam();
@@ -892,11 +892,11 @@ export default function PreGameLobby() {
           </div>
 
           {/* Blue Team */}
-          <div className="bg-white/80 border border-blue-400 shadow-xl backdrop-blur-sm rounded-lg overflow-hidden flex flex-col">
+          <div className="bg-white/80 border border-blue-400 shadow-xl backdrop-blur-sm rounded-lg">
             <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 px-4 py-4">
               <h2 className="text-xl text-white text-center font-bold tracking-wide drop-shadow-sm">Blue Team</h2>
             </div>
-            <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+            <div className="p-4 space-y-3">
               {/* Captain */}
               <div className="space-y-2">
                 <Label className="text-sm text-gray-600 font-medium">Captain</Label>

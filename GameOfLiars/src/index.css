@@ -117,4 +117,27 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Mobile-specific improvements */
+  @media (max-width: 768px) {
+    /* Ensure proper scrolling on mobile */
+    html, body {
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Improve touch targets */
+    button, input, select, textarea {
+      min-height: 44px;
+    }
+    
+    /* Better spacing for mobile */
+    .space-y-2 > * + * {
+      margin-top: 0.5rem;
+    }
+    
+    .space-y-4 > * + * {
+      margin-top: 1rem;
+    }
+  }
 }
