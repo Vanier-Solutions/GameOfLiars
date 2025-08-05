@@ -94,10 +94,6 @@ export default function GamePage() {
   const [gameEnded, setGameEnded] = useState(false);
   const [allRoundsResults, setAllRoundsResults] = useState<RoundResults[]>([]);
   
-  // Match summary state
-  const [matchSummary, setMatchSummary] = useState<any>(null);
-  const [showMatchSummary, setShowMatchSummary] = useState(false);
-  
   // Toast notification state
   const [toastNotification, setToastNotification] = useState<{
     isVisible: boolean;
@@ -242,11 +238,6 @@ export default function GamePage() {
             message: `Game Over! ${gameEndData.winner === 'blue' ? 'Blue' : 'Red'} team wins!`
           });
           // Don't auto-redirect, let host show match summary
-          break;
-        case 'matchSummary':
-          const matchSummaryData = lastMessage.data as any;
-          setMatchSummary(matchSummaryData);
-          setShowMatchSummary(true);
           break;
         case 'gameStarted':
           // Refresh game data when game starts
@@ -634,30 +625,6 @@ export default function GamePage() {
     }
   };
 
-  const handleMatchSummary = async () => {
-    try {
-      setError('');
-      
-      const response = await fetch(`${API_URL}/api/game/${lobbyCode}/match-summary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({})
-      });
-
-      const data = await response.json();
-      
-      if (!data.success) {
-        setError(data.error || 'Failed to show match summary');
-      }
-    } catch (err) {
-      console.error('Failed to show match summary:', err);
-      setError('Failed to show match summary');
-    }
-  };
-
   const getCurrentPlayerTeam = () => {
     return playerTeam;
   };
@@ -1000,7 +967,7 @@ export default function GamePage() {
                                    gameData.scores.blue >= gameData.settings.maxScore || 
                                    gameData.scores.red >= gameData.settings.maxScore ||
                                    gameData.currentRound >= gameData.settings.rounds) ? 
-                                   handleMatchSummary : handleNextRound}
+                                   handleReturnToLobby : handleNextRound}
                           className="mt-1 px-4 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white font-bold"
                           disabled={false}
                         >
@@ -1008,7 +975,7 @@ export default function GamePage() {
                             gameData.scores.blue >= gameData.settings.maxScore || 
                             gameData.scores.red >= gameData.settings.maxScore ||
                             gameData.currentRound >= gameData.settings.rounds) ? 
-                            'Match Summary' : 'Next Round'}
+                            'Return to Lobby' : 'Next Round'}
                         </Button>
                       )}
                     </div>
@@ -1046,84 +1013,6 @@ export default function GamePage() {
                       {/* Host buttons */}
                       {isHost && (
                         <div className="mt-8 space-y-4">
-                          <Button
-                            onClick={handleMatchSummary}
-                            className="px-8 py-4 text-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
-                          >
-                            Show Match Summary
-                          </Button>
-                          <Button
-                            onClick={handleReturnToLobby}
-                            className="px-8 py-4 text-xl bg-green-600 hover:bg-green-700 text-white font-bold"
-                          >
-                            Return to Lobby
-                          </Button>
-                        </div>
-                      )}
-                      
-                      {/* Non-host message */}
-                      {!isHost && (
-                        <div className="mt-8 text-gray-500">
-                          <p>Waiting for host to show match summary...</p>
-                        </div>
-                      )}
-                    </div>
-                  ) : showMatchSummary && matchSummary ? (
-                    // Match Summary Screen
-                    <div className="space-y-6 text-center">
-                      <div className="text-2xl lg:text-3xl font-bold text-gray-900">
-                        Match Summary
-                      </div>
-                      
-                      {/* Final winner */}
-                      <div className="text-xl lg:text-2xl font-bold">
-                        {matchSummary.winner === 'blue' ? (
-                          <span className="text-blue-600">Blue Team Won!</span>
-                        ) : matchSummary.winner === 'red' ? (
-                          <span className="text-red-600">Red Team Won!</span>
-                        ) : (
-                          <span className="text-amber-600">It's a Tie!</span>
-                        )}
-                      </div>
-                      
-                      {/* Final scores */}
-                      <div className="text-lg lg:text-xl text-gray-600">
-                        <p>Final Score:</p>
-                        <div className="flex justify-center space-x-8 mt-2">
-                          <span className="text-blue-600 font-bold">{matchSummary.finalScores.blue} - Blue</span>
-                          <span className="text-red-600 font-bold">{matchSummary.finalScores.red} - Red</span>
-                        </div>
-                      </div>
-                      
-                      {/* Round-by-round breakdown */}
-                      <div className="mt-6 text-left max-h-96 overflow-y-auto">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Round Details:</h3>
-                        {matchSummary.rounds.map((round: any, index: number) => (
-                          <div key={index} className="mb-4 p-4 bg-gray-50 rounded-lg">
-                            <div className="font-bold text-gray-900">Round {round.roundNumber}</div>
-                            <div className="text-sm text-gray-600 mb-2">{round.question}</div>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-blue-600 font-medium">Blue:</span> {round.blueAnswer?.answer || 'No answer'} 
-                                {round.blueAnswer?.isSteal && <span className="text-orange-600 ml-1">(Steal)</span>}
-                                <span className="ml-2 font-bold">{round.bluePoints > 0 ? '+' : ''}{round.bluePoints}</span>
-                              </div>
-                              <div>
-                                <span className="text-red-600 font-medium">Red:</span> {round.redAnswer?.answer || 'No answer'}
-                                {round.redAnswer?.isSteal && <span className="text-orange-600 ml-1">(Steal)</span>}
-                                <span className="ml-2 font-bold">{round.redPoints > 0 ? '+' : ''}{round.redPoints}</span>
-                              </div>
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              Correct: {round.correctAnswer} | Winner: {round.winner === 'blue' ? 'Blue' : round.winner === 'red' ? 'Red' : 'None'}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {/* Return to lobby button */}
-                      {isHost && (
-                        <div className="mt-8">
                           <Button
                             onClick={handleReturnToLobby}
                             className="px-8 py-4 text-xl bg-green-600 hover:bg-green-700 text-white font-bold"
@@ -1226,7 +1115,11 @@ export default function GamePage() {
                     <div className="bg-gray-50 rounded-lg p-2 overflow-y-auto mb-2 min-h-[120px] lg:min-h-[200px]">
                       <div className="space-y-1">
                         {teamChatMessages
-                          .filter(msg => msg.team === getCurrentPlayerTeam())
+                          .filter(msg => {
+                            const currentTeam = getCurrentPlayerTeam();
+                            // Show messages for the current player's team OR spectator messages if player is a spectator
+                            return msg.team === currentTeam || (currentTeam === null && msg.team === 'spectator');
+                          })
                           .map((msg) => {
                             // Determine team color for player name
                             const isRedTeam = gameData.teams.red.captain?.name === msg.playerName || 

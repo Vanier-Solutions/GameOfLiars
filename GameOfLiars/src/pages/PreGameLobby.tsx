@@ -111,10 +111,14 @@ export default function PreGameLobby() {
       const checkSession = async () => {
         if (!code || sessionChecked) return;
         
+        console.log('Checking session for lobby:', code);
         setSessionChecked(true);
         
+        // Check if we have stored player data first
         const playerId = localStorage.getItem('playerId');
         const storedPlayerName = localStorage.getItem('playerName');
+        
+        console.log('Stored player data:', { playerId, storedPlayerName });
         
         // If we have stored player data, try to verify the session
         if (playerId && storedPlayerName) {
@@ -126,45 +130,57 @@ export default function PreGameLobby() {
             if (response.ok) {
               const data = await response.json();
               if (data.success) {
+                console.log('Session verified successfully');
                 setPlayerName(storedPlayerName);
                 fetchLobbyData(code);
                 return;
               }
             }
             
-            // Session check failed, try to join with stored name
-            const joinResponse = await fetch(`${API_URL}/api/lobby/join`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                code: code,
-                playerName: storedPlayerName
-              })
-            });
-            
-            if (joinResponse.ok) {
-              const joinData = await joinResponse.json();
-              if (joinData.success) {
-                localStorage.setItem('playerId', joinData.playerId);
-                localStorage.setItem('playerName', storedPlayerName);
-                localStorage.setItem('lobbyCode', code);
-                setPlayerName(storedPlayerName);
-                fetchLobbyData(code);
-                return;
+            // Session check failed, but don't immediately show popup
+            // Try to fetch lobby data first to see if we're already in the lobby
+            console.log('Session check failed, trying to fetch lobby data');
+            try {
+              const lobbyResponse = await fetch(`${API_URL}/api/lobby/${code}`, {
+                credentials: 'include'
+              });
+              
+              if (lobbyResponse.ok) {
+                const lobbyData = await lobbyResponse.json();
+                if (lobbyData.success) {
+                  // We can access the lobby, so we might already be a player
+                  // Check if our stored name is in the lobby
+                  const allPlayers = [
+                    ...lobbyData.lobby.players.redTeam,
+                    ...lobbyData.lobby.players.blueTeam,
+                    ...lobbyData.lobby.players.spectators
+                  ];
+                  
+                  if (allPlayers.includes(storedPlayerName)) {
+                    console.log('Found our name in lobby, joining with stored credentials');
+                    setPlayerName(storedPlayerName);
+                    fetchLobbyData(code);
+                    return;
+                  }
+                }
               }
+            } catch (lobbyError) {
+              console.log('Lobby fetch failed:', lobbyError);
             }
             
-            // Both session check and join failed, show name popup
+            console.log('No valid session found, showing name popup');
             setShowNamePopup(true);
+            setLoading(false);
           } catch (error) {
+            console.log('Session check error:', error);
             setShowNamePopup(true);
+            setLoading(false);
           }
         } else {
-          // No stored data, show name popup
+          console.log('No stored player data, showing name popup');
+          // No stored data, show name popup immediately
           setShowNamePopup(true);
+          setLoading(false);
         }
       };
       
@@ -265,15 +281,24 @@ export default function PreGameLobby() {
         
         setSettings(lobby.settings);
         setError('');
-        setLoading(false); // Add this line
+        setLoading(false);
       } else {
-        setError(data.error || 'Failed to fetch lobby data');
-        setLoading(false); // Add this line
+        // If the lobby exists but we don't have a valid session, show name popup
+        if (data.error && (data.error.includes('not a player') || data.error.includes('unauthorized'))) {
+          // Only show popup if we haven't already checked the session
+          if (!sessionChecked) {
+            setShowNamePopup(true);
+          }
+          setLoading(false);
+        } else {
+          setError(data.error || 'Failed to fetch lobby data');
+          setLoading(false);
+        }
       }
     } catch (error) {
       console.error('Error fetching lobby data:', error);
       setError('Failed to fetch lobby data');
-      setLoading(false); // Add this line
+      setLoading(false);
     }
   };
 
@@ -447,7 +472,9 @@ export default function PreGameLobby() {
   };
 
   const handleJoinLobby = async () => {
-    if (!tempPlayerName.trim() || !code) return;
+    if (!tempPlayerName.trim() || !code || joiningLobby) return;
+    
+    console.log('Attempting to join lobby:', code, 'with name:', tempPlayerName.trim());
     
     // Validate name length
     if (tempPlayerName.trim().length > 20) {
@@ -478,6 +505,8 @@ export default function PreGameLobby() {
       });
 
       const data = await response.json();
+      
+      console.log('Join response:', data);
       
       if (data.success) {
         // Store player info

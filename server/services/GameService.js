@@ -13,7 +13,9 @@ export class GameService {
         if (user === correct) return true;
         
         // Check if user answer is contained in correct answer
-        if (correct.includes(user)) return true;
+        // But only if user answer is at least 3 characters or is a common abbreviation
+        const commonAbbreviations = ['usa', 'uk', 'eu', 'un', 'nato', 'fbi', 'cia', 'fda', 'epa', 'irs', 'nsa'];
+        if (correct.includes(user) && (user.length >= 3 || commonAbbreviations.includes(user))) return true;
         
         // Check if correct answer is contained in user answer
         if (user.includes(correct)) return true;
@@ -25,7 +27,7 @@ export class GameService {
         
         if (userClean && correctClean) {
             if (userClean === correctClean) return true;
-            if (correctClean.includes(userClean)) return true;
+            if (correctClean.includes(userClean) && (userClean.length >= 3 || commonAbbreviations.includes(userClean))) return true;
             if (userClean.includes(correctClean)) return true;
         }
         

@@ -89,7 +89,17 @@ export function setupSocket(server) {
             if (!player) return;
 
             const team = player.getTeam();
-            if (team === 'spectator') return;
+            
+            // Allow spectators to chat with other spectators
+            if (team === 'spectator') {
+                // Send to all spectators (including sender)
+                io.to(socket.lobbyCode).emit('teamChat', {
+                    playerName: playerName || socket.playerName,
+                    team: 'spectator',
+                    message: message
+                });
+                return;
+            }
 
             // Send to all team members (including sender)
             io.to(socket.lobbyCode).emit('teamChat', {
