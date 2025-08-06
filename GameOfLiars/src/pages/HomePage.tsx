@@ -44,6 +44,7 @@ export default function HomePage() {
       const data = await response.json();
       
       if (data.success) {
+        console.log('Lobby created successfully. Player ID:', data.playerId);
         localStorage.setItem('playerName', playerName.trim());
         localStorage.setItem('playerId', data.playerId);
         navigate(`/lobby/${data.code}`);
@@ -89,6 +90,7 @@ export default function HomePage() {
       const data = await response.json();
       
       if (data.success) {
+        console.log('Lobby joined successfully. Player ID:', data.playerId);
         localStorage.setItem('playerName', playerName.trim());
         localStorage.setItem('playerId', data.playerId);
         navigate(`/lobby/${data.code}`);
