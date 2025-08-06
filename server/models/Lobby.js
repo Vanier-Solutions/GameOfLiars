@@ -13,6 +13,7 @@ export class Lobby {
         this.gamePhase = "pregame"; // "pregame", "playing", "ended"
         this.phaseChangedAt = new Date(); // Track when the phase last changed
         this.hostDisconnectTimeout = null; // To track host disconnects
+        this.intentionallyEnded = false; // Track if lobby was intentionally ended by host
         this.settings = {
             rounds: 10,
             roundLimit: 60,
@@ -216,8 +217,9 @@ export class Lobby {
         
         // If only 1 player and that player is the host, delete
         if (totalPlayers === 1) {
-            const hostPlayer = this.getPlayerByName(this.host.getName());
-            return hostPlayer !== undefined;
+            // Check if the only player is the host
+            return this.spectators.length === 1 && this.spectators[0].getName() === this.host.getName() &&
+                   this.blueTeam.length === 0 && this.redTeam.length === 0;
         }
         
         return false;
@@ -234,6 +236,11 @@ export class Lobby {
     
     clearUsedQuestions() {
         this.usedQuestions = [];
+    }
+    
+    // Mark lobby as intentionally ended by host
+    markAsIntentionallyEnded() {
+        this.intentionallyEnded = true;
     }
     
     

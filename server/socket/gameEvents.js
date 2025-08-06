@@ -72,6 +72,19 @@ export function setupGameEvents(io, activeLobbies) {
         io.to(lobbyCode).emit('matchSummary', matchSummary);
     }
     
+    function broadcastLobbyClosed(lobbyCode, message) {
+        io.to(lobbyCode).emit('lobbyClosed', { message: message });
+        
+        // Disconnect all sockets in the lobby
+        const sockets = io.sockets.adapter.rooms.get(lobbyCode);
+        if (sockets) {
+            sockets.forEach(socketId => {
+                const sock = io.sockets.sockets.get(socketId);
+                if (sock) sock.disconnect(true);
+            });
+        }
+    }
+    
     function broadcastPlayerKicked(lobbyCode, kickedPlayerName, kickedPlayerId) {
         io.to(lobbyCode).emit('playerKicked', {
             kickedPlayer: kickedPlayerName,
@@ -92,6 +105,7 @@ export function setupGameEvents(io, activeLobbies) {
         broadcastSettingsUpdate,
         broadcastReturnToLobby,
         broadcastPlayerKicked,
-        broadcastMatchSummary
+        broadcastMatchSummary,
+        broadcastLobbyClosed
     };
 } 

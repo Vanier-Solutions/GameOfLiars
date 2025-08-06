@@ -337,6 +337,9 @@ router.delete('/:code', optionalAuth, (req, res) => {
             return res.status(403).json({ success: false, error: 'Only the host can end the lobby.' });
         }
 
+        // Mark lobby as intentionally ended to prevent disconnect timeout
+        lobby.markAsIntentionallyEnded();
+
         // Use gameEvents to notify clients and close sockets
         if (req.app.locals.gameEvents) {
             req.app.locals.gameEvents.broadcastLobbyClosed(code, 'The host has ended the lobby.');

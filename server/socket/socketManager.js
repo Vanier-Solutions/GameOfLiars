@@ -33,6 +33,13 @@ export function setupSocket(server) {
                     const player = lobby.getPlayerByName(socket.playerName);
                     
                     if (lobby.getHost().getName() === socket.playerName) {
+                        // Check if lobby was intentionally ended by host
+                        if (lobby.intentionallyEnded) {
+                            // Lobby was intentionally ended, don't show disconnect message
+                            console.log(`Host ${socket.playerName} disconnected from intentionally ended lobby ${socket.lobbyCode}`);
+                            return;
+                        }
+                        
                         // Host disconnected: Notify players and start a 30-second timer
                         io.to(socket.lobbyCode).emit('hostDisconnected', { 
                             message: 'The host has disconnected. The lobby will close in 30 seconds if they do not reconnect.' 
@@ -66,9 +73,9 @@ export function setupSocket(server) {
                         });
                         
                         // Check if lobby should be deleted (no players left)
-                        if (lobby.getTotalPlayers() === 0) {
+                        if (lobby.shouldBeDeleted()) {
                             io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'Lobby closed because all players have left.' });
-                            activeLobbies.delete(socket.lobbyCode4);
+                            activeLobbies.delete(socket.lobbyCode);
                             console.log(`Lobby ${socket.lobbyCode} closed due to all players leaving.`);
                         }
                     }
@@ -122,6 +129,9 @@ export function setupSocket(server) {
         socket.on('endLobby', () => {
             const lobby = activeLobbies.get(socket.lobbyCode);
             if (lobby && lobby.getHost().getName() === socket.playerName) {
+                // Mark lobby as intentionally ended to prevent disconnect timeout
+                lobby.markAsIntentionallyEnded();
+                
                 // Notify players and disconnect them
                 io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'The host has ended the lobby.' });
 
