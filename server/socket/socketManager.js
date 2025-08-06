@@ -12,7 +12,8 @@ export function setupSocket(server) {
                 if (origin.includes('localhost') || 
                     origin.includes('127.0.0.1') || 
                     origin.includes('192.168.1.200') ||
-                    origin.includes('172.16.90.208')) {
+                    origin.includes('172.16.90.208') ||
+                    origin.includes('172.16.92.228')) {
                     return callback(null, true);
                 }
                 
@@ -27,9 +28,51 @@ export function setupSocket(server) {
         // Handle disconnect
         socket.on('disconnect', () => {
             if (socket.lobbyCode) {
-                socket.to(socket.lobbyCode).emit('playerLeft', {
-                    playerName: socket.playerName
-                });
+                const lobby = activeLobbies.get(socket.lobbyCode);
+                if (lobby) {
+                    const player = lobby.getPlayerByName(socket.playerName);
+                    
+                    if (lobby.getHost().getName() === socket.playerName) {
+                        // Host disconnected: Notify players and start a 30-second timer
+                        io.to(socket.lobbyCode).emit('hostDisconnected', { 
+                            message: 'The host has disconnected. The lobby will close in 30 seconds if they do not reconnect.' 
+                        });
+
+                        lobby.hostDisconnectTimeout = setTimeout(() => {
+                            const currentLobby = activeLobbies.get(socket.lobbyCode);
+                            // Check if the lobby still exists and the timeout is still valid (host hasn't reconnected)
+                            if (currentLobby && currentLobby.hostDisconnectTimeout) {
+                                io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'Lobby closed because the host did not reconnect in time.' });
+
+                                const sockets = io.sockets.adapter.rooms.get(socket.lobbyCode);
+                                if (sockets) {
+                                    sockets.forEach(socketId => {
+                                        const sock = io.sockets.sockets.get(socketId);
+                                        if (sock) sock.disconnect(true);
+                                    });
+                                }
+                                
+                                activeLobbies.delete(socket.lobbyCode);
+                                console.log(`Lobby ${socket.lobbyCode} closed due to host timeout.`);
+                            }
+                        }, 30000); // 30 seconds
+                    } else if (player) {
+                        // Regular player disconnected - remove them from the lobby and notify others
+                        lobby.removePlayer(player);
+                        
+                        // Notify other players
+                        socket.to(socket.lobbyCode).emit('playerLeft', {
+                            playerName: socket.playerName
+                        });
+                        
+                        // Check if lobby should be deleted (no players left)
+                        if (lobby.getTotalPlayers() === 0) {
+                            io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'Lobby closed because all players have left.' });
+                            activeLobbies.delete(socket.lobbyCode4);
+                            console.log(`Lobby ${socket.lobbyCode} closed due to all players leaving.`);
+                        }
+                    }
+                }
             }
         });
 
@@ -50,6 +93,13 @@ export function setupSocket(server) {
                 return;
             }
 
+            // If the host has reconnected, clear the disconnect timeout and notify players
+            if (lobby.getHost().getName() === playerName && lobby.hostDisconnectTimeout) {
+                clearTimeout(lobby.hostDisconnectTimeout);
+                lobby.hostDisconnectTimeout = null;
+                io.to(code.toUpperCase()).emit('hostReconnected', { message: 'The host has reconnected.' });
+            }
+
             // Leave any previous lobby room
             if (socket.lobbyCode && socket.lobbyCode !== code.toUpperCase()) {
                 socket.leave(socket.lobbyCode);
@@ -66,6 +116,28 @@ export function setupSocket(server) {
                 team: player.getTeam(),
                 role: player.getRole()
             });
+        });
+
+        // Host ends the lobby
+        socket.on('endLobby', () => {
+            const lobby = activeLobbies.get(socket.lobbyCode);
+            if (lobby && lobby.getHost().getName() === socket.playerName) {
+                // Notify players and disconnect them
+                io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'The host has ended the lobby.' });
+
+                const sockets = io.sockets.adapter.rooms.get(socket.lobbyCode);
+                if (sockets) {
+                    sockets.forEach(socketId => {
+                        const sock = io.sockets.sockets.get(socketId);
+                        if (sock) {
+                            sock.disconnect(true);
+                        }
+                    });
+                }
+                
+                activeLobbies.delete(socket.lobbyCode);
+                console.log(`Lobby ${socket.lobbyCode} ended by host.`);
+            }
         });
 
         // Leave lobby room

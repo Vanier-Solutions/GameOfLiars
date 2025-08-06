@@ -63,6 +63,8 @@ export default function PreGameLobby() {
   // Add flag to prevent multiple session checks
   const [sessionChecked, setSessionChecked] = useState(false);
   
+  const [hostDisconnected, setHostDisconnected] = useState(false);
+
   const [lobbyData, setLobbyData] = useState<LobbyData>({
     code: '',
     host: '',
@@ -218,6 +220,19 @@ export default function PreGameLobby() {
         case 'playerLeft':
           // Refresh lobby data when players join/leave
           fetchLobbyData(lobbyCode);
+          break;
+        case 'hostDisconnected':
+            setHostDisconnected(true);
+            break;
+        case 'hostReconnected':
+            setHostDisconnected(false);
+            // Optionally, show a toast notification
+            break;
+        case 'lobbyClosed':
+          // The lobby was closed by the server, redirect to home
+          const messageData = lastMessage.data as { message?: string };
+          alert(messageData.message || 'The lobby has been closed.');
+          window.location.href = '/';
           break;
         case 'error':
           const errorData = lastMessage.data as any;
@@ -425,6 +440,28 @@ export default function PreGameLobby() {
     }
   };
 
+  const handleEndLobby = async () => {
+      if (!isHost) return;
+
+      if (window.confirm('Are you sure you want to end this lobby for everyone?')) {
+          try {
+              const response = await fetch(`${API_URL}/api/lobby/${lobbyCode}`, {
+                  method: 'DELETE',
+                  credentials: 'include',
+              });
+
+              const data = await response.json();
+              if (!data.success) {
+                  setError(data.error || 'Failed to end the lobby.');
+              }
+              // On success, the socket event will handle the redirect
+          } catch (err) {
+              console.error('Failed to end lobby:', err);
+              setError('An error occurred while trying to end the lobby.');
+          }
+      }
+  };
+
   const handleKickPlayer = async (playerNameToKick: string) => {
     if (!isHost) return;
     
@@ -607,13 +644,13 @@ export default function PreGameLobby() {
             <Button
               onClick={handleJoinLobby}
               disabled={!tempPlayerName.trim() || joiningLobby}
-              className="h-9 bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:bg-blue-300 disabled:text-blue-500"
+              className="h-9 bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:bg-blue-300 disabled:text-blue-500 cursor-pointer"
             >
               {joiningLobby ? 'Joining...' : 'Join Lobby'}
             </Button>
             <Button
               onClick={handleCancelJoin}
-              className="h-9 bg-gray-200 text-gray-800 font-medium"
+              className="h-9 bg-gray-200 text-gray-800 font-medium cursor-pointer"
             >
               Cancel
             </Button>
@@ -631,7 +668,7 @@ export default function PreGameLobby() {
           <p className="text-gray-700 mt-2">{error}</p>
           <Button 
             onClick={() => window.location.href = '/'}
-            className="mt-4"
+            className="mt-4 cursor-pointer"
           >
             Return Home
           </Button>
@@ -644,6 +681,13 @@ export default function PreGameLobby() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4">
       <div className="max-w-7xl mx-auto space-y-6">
         
+        {hostDisconnected && (
+            <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 text-center" role="alert">
+                <p className="font-bold">Host Disconnected</p>
+                <p>The host has disconnected. If they do not reconnect within 30 seconds, the lobby will be closed.</p>
+            </div>
+        )}
+
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-light text-gray-900 tracking-tight">
@@ -653,8 +697,18 @@ export default function PreGameLobby() {
             <span>Lobby Code: <span className="font-mono font-semibold text-lg">{lobbyData.code}</span></span>
             <Separator orientation="vertical" className="h-4" />
             <span>Host: {lobbyData.host}</span>
-            <Separator orientation="vertical" className="h-4" />
-            
+            {isHost && (
+              <>
+                <Separator orientation="vertical" className="h-4" />
+                <Button
+                  onClick={handleEndLobby}
+                  variant="link"
+                  className="h-auto p-0 text-xs text-red-600 hover:text-red-800 cursor-pointer"
+                >
+                  End Lobby
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -686,7 +740,7 @@ export default function PreGameLobby() {
                       {isHost && lobbyData.teams.red.captain.name !== playerName && (
                         <button
                           onClick={() => handleKickPlayer(lobbyData.teams.red.captain!.name)}
-                          className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors"
+                          className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors cursor-pointer"
                           title="Kick player"
                         >
                           ✕
@@ -700,7 +754,7 @@ export default function PreGameLobby() {
                     onClick={() => handleJoinTeam('red', 'captain')}
                     variant="outline"
                     size="sm"
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50 text-sm"
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50 text-sm cursor-pointer"
                   >
                     Join as Captain
                   </Button>
@@ -721,7 +775,7 @@ export default function PreGameLobby() {
                         {isHost && player.name !== playerName && (
                           <button
                             onClick={() => handleKickPlayer(player.name)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors"
+                            className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors cursor-pointer"
                             title="Kick player"
                           >
                             ✕
@@ -735,7 +789,7 @@ export default function PreGameLobby() {
                     onClick={() => handleJoinTeam('red', 'player')}
                     variant="outline"
                     size="sm"
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50 text-sm"
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50 text-sm cursor-pointer"
                   >
                     Join Team
                   </Button>
@@ -770,7 +824,7 @@ export default function PreGameLobby() {
                           {isHost && spectator.name !== playerName && (
                             <button
                               onClick={() => handleKickPlayer(spectator.name)}
-                              className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors"
+                              className="text-red-600 hover:text-red-800 text-sm font-medium px-1 py-1 rounded hover:bg-red-100 transition-colors cursor-pointer"
                               title="Kick player"
                             >
                               ✕
@@ -834,7 +888,7 @@ export default function PreGameLobby() {
                     <Button 
                       onClick={handleUpdateSettings}
                       size="sm"
-                      className="w-full h-8 bg-gray-700 hover:bg-gray-600 text-white font-medium text-sm"
+                      className="w-full h-8 bg-gray-700 hover:bg-gray-600 text-white font-medium text-sm cursor-pointer"
                     >
                       Update Settings
                     </Button>
@@ -855,7 +909,7 @@ export default function PreGameLobby() {
                   <Button
                     onClick={handleStartGame}
                     disabled={!canStartGame}
-                    className="w-full h-10 bg-gray-900 hover:bg-gray-800 text-white font-medium disabled:bg-gray-300 disabled:text-gray-500"
+                    className="w-full h-10 bg-green-600 hover:bg-green-700 text-white font-medium disabled:bg-gray-300 disabled:text-gray-500 cursor-pointer"
                   >
                     {canStartGame ? 'Start Game' : 'Need Captains for Both Teams'}
                   </Button>
@@ -911,7 +965,7 @@ export default function PreGameLobby() {
                     onClick={handleSendMessage}
                     disabled={!messageInput.trim()}
                     size="sm"
-                    className="px-3 h-8"
+                    className="px-3 h-8 cursor-pointer"
                   >
                     Send
                   </Button>
@@ -939,7 +993,7 @@ export default function PreGameLobby() {
                       {isHost && lobbyData.teams.blue.captain.name !== playerName && (
                         <button
                           onClick={() => handleKickPlayer(lobbyData.teams.blue.captain!.name)}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium px-1 py-1 rounded hover:bg-blue-100 transition-colors"
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium px-1 py-1 rounded hover:bg-blue-100 transition-colors cursor-pointer"
                           title="Kick player"
                         >
                           ✕
@@ -953,7 +1007,7 @@ export default function PreGameLobby() {
                     onClick={() => handleJoinTeam('blue', 'captain')}
                     variant="outline"
                     size="sm"
-                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 text-sm"
+                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 text-sm cursor-pointer"
                   >
                     Join as Captain
                   </Button>
@@ -974,7 +1028,7 @@ export default function PreGameLobby() {
                         {isHost && player.name !== playerName && (
                           <button
                             onClick={() => handleKickPlayer(player.name)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium px-1 py-1 rounded hover:bg-blue-100 transition-colors"
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium px-1 py-1 rounded hover:bg-blue-100 transition-colors cursor-pointer"
                             title="Kick player"
                           >
                             ✕
@@ -988,7 +1042,7 @@ export default function PreGameLobby() {
                     onClick={() => handleJoinTeam('blue', 'player')}
                     variant="outline"
                     size="sm"
-                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 text-sm"
+                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 text-sm cursor-pointer"
                   >
                     Join Team
                   </Button>
@@ -1012,13 +1066,13 @@ export default function PreGameLobby() {
             <div className="items-center px-4 py-3">
               <button
                 onClick={confirmKick}
-                className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
               >
                 Kick
               </button>
               <button
                 onClick={cancelKick}
-                className="mt-3 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                className="mt-3 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 cursor-pointer"
               >
                 Cancel
               </button>

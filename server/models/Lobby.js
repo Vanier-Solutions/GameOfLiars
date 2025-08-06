@@ -11,6 +11,8 @@ export class Lobby {
         this.host = host;
         this.code = code;
         this.gamePhase = "pregame"; // "pregame", "playing", "ended"
+        this.phaseChangedAt = new Date(); // Track when the phase last changed
+        this.hostDisconnectTimeout = null; // To track host disconnects
         this.settings = {
             rounds: 10,
             roundLimit: 60,
@@ -120,6 +122,7 @@ export class Lobby {
 
     setGamePhase(phase) {
         this.gamePhase = phase;
+        this.phaseChangedAt = new Date();
     }
 
     setRoundNumber(roundNumber) {

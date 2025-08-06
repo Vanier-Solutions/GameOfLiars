@@ -318,6 +318,39 @@ router.put('/:code/settings', requireAuth, (req, res) => {
     }
 });
 
+// Endpoint for the host to end their lobby
+router.delete('/:code', optionalAuth, (req, res) => {
+    try {
+        const { code } = req.params;
+        const player = req.user;
+
+        if (!player) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+
+        const lobby = activeLobbies.get(code.toUpperCase());
+        if (!lobby) {
+            return res.status(404).json({ success: false, error: 'Lobby not found' });
+        }
+
+        if (lobby.getHost().getId() !== player.id) {
+            return res.status(403).json({ success: false, error: 'Only the host can end the lobby.' });
+        }
+
+        // Use gameEvents to notify clients and close sockets
+        if (req.app.locals.gameEvents) {
+            req.app.locals.gameEvents.broadcastLobbyClosed(code, 'The host has ended the lobby.');
+        }
+
+        activeLobbies.delete(code.toUpperCase());
+        console.log(`Lobby ${code} was ended by the host.`);
+        res.json({ success: true, message: 'Lobby has been successfully ended.' });
+    } catch (error) {
+        console.error('Error ending lobby:', error);
+        res.status(500).json({ success: false, error: 'Failed to end lobby' });
+    }
+});
+
 // Debug route to clean up all lobbies (for testing)
 router.post('/debug/cleanup', (req, res) => {
     for (const [code, lobby] of activeLobbies.entries()) {

@@ -5,12 +5,11 @@ import session from 'express-session';
 import http from 'http';
 import os from 'os';
 import connectDB from './db/connection.js';
-import lobbyRoutes from './routes/lobby.js';
+import lobbyRoutes, { activeLobbies } from './routes/lobby.js';
 import playerRoutes from './routes/player.js';
 import gameRoutes from './routes/game.js';
 import { setupSocket } from './socket/socketManager.js';
 import { setupGameEvents } from './socket/gameEvents.js';
-import { activeLobbies } from './routes/lobby.js';
 
 dotenv.config();
 
@@ -27,7 +26,8 @@ app.use(cors({
     if (origin.includes('localhost') || 
         origin.includes('127.0.0.1') || 
         origin.includes('192.168.1.200') ||
-        origin.includes('172.16.90.208')) {
+        origin.includes('172.16.90.208') ||
+    origin.includes('172.16.92.228')) {
       return callback(null, true);
     }
     
@@ -96,6 +96,35 @@ const io = setupSocket(server);
 // Setup game events and make them available to routes
 const gameEvents = setupGameEvents(io, activeLobbies);
 app.locals.gameEvents = gameEvents;
+
+// Periodically check for inactive lobbies to clean up
+setInterval(() => {
+    const now = new Date();
+    for (const [code, lobby] of activeLobbies.entries()) {
+        const timeSincePhaseChange = now - lobby.phaseChangedAt;
+
+        // Inactive for 5 minutes in pregame or ended phase
+        if ((lobby.gamePhase === 'pregame' || lobby.gamePhase === 'ended') && timeSincePhaseChange > 5 * 60 * 1000) {
+            // Notify all players in the lobby that the lobby is closing
+            io.to(code).emit('lobbyClosed', { message: 'Lobby closed due to inactivity.' });
+
+            // Disconnect all sockets in the lobby from the server-side
+            const sockets = io.sockets.adapter.rooms.get(code);
+            if (sockets) {
+                sockets.forEach(socketId => {
+                    const socket = io.sockets.sockets.get(socketId);
+                    if (socket) {
+                        socket.disconnect(true);
+                    }
+                });
+            }
+
+            // Finally, delete the lobby
+            activeLobbies.delete(code);
+            console.log(`Lobby ${code} has been closed and removed due to inactivity.`);
+        }
+    }
+}, 30000); // Run every 30 seconds
 
 // Start server
 server.listen(PORT, () => {

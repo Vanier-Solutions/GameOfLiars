@@ -103,6 +103,8 @@ export default function GamePage() {
     message: ''
   });
 
+  const [hostDisconnected, setHostDisconnected] = useState(false);
+
   const [gameData, setGameData] = useState<GameData>({
     code: '',
     host: '',
@@ -247,6 +249,12 @@ export default function GamePage() {
             fetchGameData(code, playerName);
           }
           break;
+        case 'lobbyClosed':
+          // The lobby was closed by the server, redirect to home
+          const messageData = lastMessage.data as { message?: string };
+          alert(messageData.message || 'The lobby has been closed.');
+          window.location.href = '/';
+          break;
         case 'error':
           const errorData = lastMessage.data as any;
           setError(errorData?.message || 'Game error occurred');
@@ -255,6 +263,13 @@ export default function GamePage() {
           // All players return to lobby when host clicks return
           window.location.href = `/lobby/${lobbyCode}`;
           break;
+        case 'hostDisconnected':
+            setHostDisconnected(true);
+            break;
+        case 'hostReconnected':
+            setHostDisconnected(false);
+            setToastNotification({ isVisible: true, message: 'The host has reconnected.' });
+            break;
       }
     }
   }, [lastMessage, code, playerName, playerTeam, gameData.settings.roundLimit]);
@@ -677,6 +692,14 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 lg:p-4">
+      {/* Host Disconnected Banner */}
+      {hostDisconnected && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 text-center mb-4" role="alert">
+              <p className="font-bold">Host Disconnected</p>
+              <p>The host has disconnected. If they do not reconnect within 30 seconds, the lobby will be closed.</p>
+          </div>
+      )}
+
       {/* Toast Notification */}
       <ToastNotification
         message={toastNotification.message}

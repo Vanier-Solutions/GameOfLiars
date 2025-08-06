@@ -1,4 +1,4 @@
-import { io } from 'socket.io-client';
+import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { API_URL } from '../config/api';
 
@@ -158,6 +158,19 @@ class SocketManager extends EventEmitter {
 
     this.socket.on('returnToLobby', (data: unknown) => {
       this.emit('message', { type: 'returnToLobby', data });
+    });
+
+    // Add missing event listeners for host disconnect/reconnect and lobby closure
+    this.socket.on('hostDisconnected', (data: unknown) => {
+      this.emit('message', { type: 'hostDisconnected', data });
+    });
+
+    this.socket.on('hostReconnected', (data: unknown) => {
+      this.emit('message', { type: 'hostReconnected', data });
+    });
+
+    this.socket.on('lobbyClosed', (data: unknown) => {
+      this.emit('message', { type: 'lobbyClosed', data });
     });
 
     this.socket.on('error', (error: any) => {
