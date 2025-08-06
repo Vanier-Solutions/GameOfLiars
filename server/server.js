@@ -58,8 +58,8 @@ app.use(session({
   resave: false,
   saveUninitialized: true,
   cookie: {
-    secure: true, // Must be true for sameSite: 'none'
-    httpOnly: true,
+    secure: true, // Must be true for HTTPS
+    httpOnly: false, // Allow JavaScript access for debugging
     maxAge: 4 * 60 * 60 * 1000, // 4 hours
     sameSite: 'none' // Required for cross-domain cookies
   },

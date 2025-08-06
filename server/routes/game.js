@@ -15,8 +15,17 @@ router.post("/:code/start", optionalAuth, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify host using session
-        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        // Verify host using session - more lenient approach
+        let player = null;
+        if (req.user) {
+            // Try to find player by ID first
+            player = lobby.getPlayerById(req.user.id);
+            
+            // If not found by ID, try to find by name and lobby code match
+            if (!player && req.user.lobbyCode === code) {
+                player = lobby.getPlayerByName(req.user.name);
+            }
+        }
         
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can start the game' });
@@ -184,18 +193,38 @@ router.post("/:code/round/next", optionalAuth, async (req, res) => {
 router.get("/:code/state", optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
+        
+        // Debug logging
+        console.log('GET /api/game/:code/state - Debug info:');
+        console.log('- Code:', code);
+        console.log('- Session ID:', req.sessionID);
+        console.log('- User:', req.user);
+        console.log('- Origin:', req.headers.origin);
+        console.log('- Cookies:', req.headers.cookie);
+        
         const lobby = activeLobbies.get(code);
         
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify player is in lobby using session
+        // More lenient authentication - similar to lobby endpoint
         if (req.user) {
-            const player = lobby.getPlayerById(req.user.id);
-            if (!player) {
-                return res.status(403).json({ success: false, error: 'You are not a player in this lobby' });
+            // Allow access if the user's session lobby code matches OR they're a player in the lobby
+            const isInCorrectLobby = req.user.lobbyCode === code;
+            const isPlayerInLobby = lobby.hasPlayerId(req.user.id);
+            
+            if (!isInCorrectLobby && !isPlayerInLobby) {
+                return res.status(403).json({ 
+                    success: false, 
+                    error: 'You are not a player in this lobby',
+                    needsToJoin: true,
+                    lobbyCode: code
+                });
             }
+        } else {
+            // If no session, still allow access but with limited info
+            console.log(`Game state accessed without session for lobby ${code}`);
         }
         
         const gameState = lobby.getGameState();
