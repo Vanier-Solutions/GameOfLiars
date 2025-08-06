@@ -1,5 +1,4 @@
 import io from 'socket.io-client';
-import type { Socket } from 'socket.io-client';
 import { API_URL } from '../config/api';
 
 // Simple browser-compatible event emitter
@@ -30,7 +29,7 @@ interface WebSocketMessage {
 }
 
 class SocketManager extends EventEmitter {
-  private socket: Socket | null = null;
+  private socket: any = null;
   private isConnected = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
@@ -52,9 +51,7 @@ class SocketManager extends EventEmitter {
     this.playerName = playerName;
 
     try {
-      this.socket = io(API_URL, {
-        withCredentials: true // Add session support for socket connections
-      });
+      this.socket = io(API_URL);
 
       this.socket.on('connect', () => {
         this.isConnected = true;

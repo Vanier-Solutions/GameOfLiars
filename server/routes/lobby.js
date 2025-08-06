@@ -52,7 +52,21 @@ router.post("/create", (req, res) => {
             name: playerName,
             lobbyCode: code
         };
-
+        
+        // Explicitly save the session
+        req.session.save((err) => {
+            if (err) {
+                console.error('Session save error:', err);
+            } else {
+                console.log('Session saved successfully');
+            }
+        });
+        
+        console.log('CREATE LOBBY - Session set:');
+        console.log('- Session ID:', req.sessionID);
+        console.log('- Session user:', req.session.user);
+        console.log('- Host ID:', host.getId());
+        
         const response = {
             success: true,
             code: lobby.getCode(),
@@ -111,6 +125,13 @@ router.post("/join", (req, res) => {
             name: playerName,
             lobbyCode: actualCode.toUpperCase()
         };
+        
+        // Explicitly save the session
+        req.session.save((err) => {
+            if (err) {
+                console.error('Session save error:', err);
+            }
+        });
 
         // Broadcast team update
         const gameEvents = req.app.locals.gameEvents;
@@ -204,23 +225,39 @@ router.get('/:code', optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
         
+        // Debug logging
+        console.log('GET /api/lobby/:code - Debug info:');
+        console.log('- Code:', code);
+        console.log('- Session:', req.session);
+        console.log('- User:', req.user);
+        console.log('- Session ID:', req.sessionID);
+        
         const lobby = activeLobbies.get(code);
         
         if (!lobby) {
             return res.status(404).json({ error: 'Lobby not found' });
         }
         
-        // Check if user is authenticated and not a member of the lobby
-        if (req.user && !lobby.hasPlayerId(req.user.id)) {
-            return res.status(403).json({ 
-                error: 'You are not a player in this lobby',
-                needsToJoin: true,
-                lobbyCode: code
-            });
-        }
-        
-        // If user is not authenticated, they need to join
-        if (!req.user) {
+        // If user is authenticated, check if they belong to this lobby
+        if (req.user) {
+            console.log('- User is authenticated');
+            // Allow access if the user's session lobby code matches OR they're a player in the lobby
+            const isInCorrectLobby = req.user.lobbyCode === code;
+            const isPlayerInLobby = lobby.hasPlayerId(req.user.id);
+            
+            console.log('- isInCorrectLobby:', isInCorrectLobby);
+            console.log('- isPlayerInLobby:', isPlayerInLobby);
+            
+            if (!isInCorrectLobby && !isPlayerInLobby) {
+                return res.status(403).json({ 
+                    error: 'You are not a player in this lobby',
+                    needsToJoin: true,
+                    lobbyCode: code
+                });
+            }
+        } else {
+            console.log('- User is NOT authenticated');
+            // If user is not authenticated, they need to join
             return res.status(403).json({ 
                 error: 'You need to join this lobby to view it',
                 needsToJoin: true,

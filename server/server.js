@@ -18,29 +18,11 @@ const PORT = process.env.PORT || 5051;
 
 // Middleware
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow localhost and IP addresses for development
-    if (origin.includes('localhost') || 
-        origin.includes('127.0.0.1') || 
-        origin.includes('192.168.1.200') ||
-        origin.includes('172.16.90.208') ||
-    origin.includes('172.16.92.228')) {
-      return callback(null, true);
-    }
-    
-    // Allow specific production domains if needed
-    // if (origin === 'https://yourdomain.com') {
-    //   return callback(null, true);
-    // }
-    
-    callback(new Error('Not allowed by CORS'));
-  },
+  origin: true, // Allow all origins during development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['Set-Cookie']
 }));
 
 if (!process.env.SESSION_SECRET) {
@@ -51,16 +33,26 @@ if (!process.env.SESSION_SECRET) {
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: true, // Changed back to true to ensure sessions are created
   cookie: {
-    secure: false,
-    maxAge: 4 * 60 * 60 * 1000 // 4 hours
-  }
+    secure: false, // Set to false for HTTP (development)
+    httpOnly: false, // Set to false to allow JavaScript access
+    maxAge: 4 * 60 * 60 * 1000, // 4 hours
+    sameSite: false // Disable sameSite for maximum compatibility in development
+  },
+  name: 'connect.sid' // Use default session name for better compatibility
 }));
 
 
 app.use(express.json());
 
+// Debug middleware to log session info
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path} - Session ID: ${req.sessionID}, User: ${req.session?.user?.name || 'none'}`);
+  console.log(`  Cookies: ${JSON.stringify(req.headers.cookie)}`);
+  console.log(`  Origin: ${req.headers.origin}`);
+  next();
+});
 
 // Routes
 app.use('/api/lobby', lobbyRoutes);
@@ -127,7 +119,7 @@ setInterval(() => {
 }, 30000); // Run every 30 seconds
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is listening on port ${PORT}`);
     console.log(`Local access: http://localhost:${PORT}`);
     

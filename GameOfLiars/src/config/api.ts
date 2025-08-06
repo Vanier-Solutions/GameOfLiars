@@ -1,18 +1,14 @@
 // API Configuration
 const getApiUrl = () => {
-  // In development, use localhost or IP address
+  // In development, use the same hostname as the frontend
   if (import.meta.env.DEV) {
-    // Check if we're accessing via IP address
+    // Get the current hostname from the browser
     const currentHost = window.location.hostname;
-    if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-      // We're accessing via IP address, use the same hostname
-      return `http://${currentHost}:5051`;
-    }
-    return 'http://localhost:5051';
+    return `http://${currentHost}:5051`;
   }
   
-  
-  return import.meta.env.VITE_API_URL || 'https:/GameOfLiars.vercel.app';
+  // In production, use environment variable or Railway URL
+  return import.meta.env.VITE_API_URL || 'https://your-railway-app.railway.app';
 };
 
 export const API_URL = getApiUrl(); 
