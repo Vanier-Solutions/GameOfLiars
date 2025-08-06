@@ -1,6 +1,0 @@
-{
-    "buildCommand": "cd GameOfLiars && npm run build",
-    "outputDirectory": "GameOfLiars/dist",
-    "installCommand": "cd GameOfLiars && npm install",
-    "framework": "vite"
-}
