@@ -231,6 +231,7 @@ router.get('/:code', optionalAuth, (req, res) => {
         console.log('- Session:', req.session);
         console.log('- User:', req.user);
         console.log('- Session ID:', req.sessionID);
+        console.log('- Cookies:', req.headers.cookie);
         
         const lobby = activeLobbies.get(code);
         

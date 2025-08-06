@@ -52,15 +52,15 @@ if (!process.env.SESSION_SECRET) {
 // Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: true, // Changed back to true to ensure sessions are created
+  resave: true, // Changed to true to ensure session is saved
+  saveUninitialized: true,
   cookie: {
-    secure: false, // Set to false for HTTP (development)
-    httpOnly: false, // Set to false to allow JavaScript access
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    httpOnly: true, // Changed to true for security
     maxAge: 4 * 60 * 60 * 1000, // 4 hours
-    sameSite: false // Disable sameSite for maximum compatibility in development
+    sameSite: 'lax' // Changed to 'lax' for better compatibility
   },
-  name: 'connect.sid' // Use default session name for better compatibility
+  name: 'connect.sid'
 }));
 
 
