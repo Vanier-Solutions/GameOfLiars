@@ -462,7 +462,7 @@ export default function GamePage() {
           'Content-Type': 'application/json',
         },
         credentials: 'include', // Use session for auth
-        body: JSON.stringify({}) // Remove playerId - backend will get it from session
+        body: JSON.stringify({ lobbyCode }) // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();
@@ -491,7 +491,7 @@ export default function GamePage() {
           'Content-Type': 'application/json',
         },
         credentials: 'include', // Use session for auth
-        body: JSON.stringify({}) // Remove playerId - backend will get it from session
+        body: JSON.stringify({ lobbyCode }) // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();
@@ -583,7 +583,7 @@ export default function GamePage() {
           'Content-Type': 'application/json',
         },
         credentials: 'include', // Use session for auth
-        body: JSON.stringify({}) // Remove playerId - backend will get it from session
+        body: JSON.stringify({ lobbyCode }) // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();
@@ -626,7 +626,7 @@ export default function GamePage() {
           'Content-Type': 'application/json',
         },
         credentials: 'include', // Use session for auth
-        body: JSON.stringify({}) // Remove playerId - backend will get it from session
+        body: JSON.stringify({ lobbyCode }) // Remove playerId - backend will get it from session
       });
 
       const data = await response.json();
