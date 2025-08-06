@@ -9,11 +9,7 @@ export function setupSocket(server) {
                 if (!origin) return callback(null, true);
                 
                 // Allow localhost and IP addresses for development
-                if (origin.includes('localhost') || 
-                    origin.includes('127.0.0.1') || 
-                    origin.includes('192.168.1.200') ||
-                    origin.includes('172.16.90.208') ||
-                    origin.includes('172.16.92.228')) {
+                if (origin.includes('game-of-liars.vercel.app')) {
                     return callback(null, true);
                 }
                 
