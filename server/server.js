@@ -49,16 +49,19 @@ if (!process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET is not set');
 }
 
+// Trust the first proxy
+app.set('trust proxy', 1);
+
 // Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET,
-  resave: true, // Changed to true to ensure session is saved
+  resave: false,
   saveUninitialized: true,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-    httpOnly: true, // Changed to true for security
+    secure: true, // Must be true for sameSite: 'none'
+    httpOnly: true,
     maxAge: 4 * 60 * 60 * 1000, // 4 hours
-    sameSite: 'lax' // Changed to 'lax' for better compatibility
+    sameSite: 'none' // Required for cross-domain cookies
   },
   name: 'connect.sid'
 }));
