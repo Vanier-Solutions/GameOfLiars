@@ -34,7 +34,7 @@ export class GameService {
         return false;
     }
     
-    static async startGame(lobby) {
+    static async startGame(lobby, req) {
         if (lobby.gamePhase !== 'pregame') {
             throw new Error('Game already started');
         }
@@ -45,9 +45,46 @@ export class GameService {
         
         lobby.setGamePhase('playing');
         lobby.setRoundNumber(1);
+
+        // Update sessions for all players
+        await this.updatePlayerSessions(lobby, req);
         
         // Create first round
         return await this.createNewRound(lobby);
+    }
+
+    static async updatePlayerSessions(lobby, req) {
+        const sessionStore = req.sessionStore;
+        if (!sessionStore) {
+            console.error('Session store not found');
+            return;
+        }
+
+        sessionStore.all(async (err, sessions) => {
+            if (err) {
+                console.error('Error getting sessions from store:', err);
+                return;
+            }
+
+            const allPlayers = lobby.getAllPlayers();
+            for (const player of allPlayers) {
+                for (const sid in sessions) {
+                    const session = sessions[sid];
+                    if (session.user && session.user.id === player.getId()) {
+                        // Update the session
+                        session.user.gamePhase = 'playing';
+                        
+                        // Save the updated session
+                        sessionStore.set(sid, session, (err) => {
+                            if (err) {
+                                console.error(`Error saving session for player ${player.getName()}:`, err);
+                            }
+                        });
+                        break; 
+                    }
+                }
+            }
+        });
     }
     
     static async createNewRound(lobby) {

@@ -187,6 +187,10 @@ export class Lobby {
                this.blueTeam.find(p => p.getId() === id) ||
                this.redTeam.find(p => p.getId() === id);
     }
+
+    getAllPlayers() {
+        return [...this.spectators, ...this.blueTeam, ...this.redTeam];
+    }
     
     hasPlayerId(id) {
         return this.getPlayerById(id) !== undefined;

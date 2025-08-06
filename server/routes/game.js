@@ -22,7 +22,7 @@ router.post("/:code/start", optionalAuth, async (req, res) => {
             return res.status(403).json({ success: false, error: 'Only the host can start the game' });
         }
         
-        const round = await GameService.startGame(lobby);
+        const round = await GameService.startGame(lobby, req);
         
         // Broadcast game started event
         if (req.app.locals.gameEvents) {
