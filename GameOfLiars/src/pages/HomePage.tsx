@@ -45,8 +45,8 @@ export default function HomePage() {
       
       if (data.success) {
         console.log('Lobby created successfully. Player ID:', data.playerId);
-        localStorage.setItem('playerName', playerName.trim());
-        localStorage.setItem('playerId', data.playerId);
+        sessionStorage.setItem('playerName', playerName.trim());
+        sessionStorage.setItem('playerId', data.playerId);
         navigate(`/lobby/${data.code}`);
       } else {
         setError(data.error || 'Failed to create lobby');
@@ -91,8 +91,8 @@ export default function HomePage() {
       
       if (data.success) {
         console.log('Lobby joined successfully. Player ID:', data.playerId);
-        localStorage.setItem('playerName', playerName.trim());
-        localStorage.setItem('playerId', data.playerId);
+        sessionStorage.setItem('playerName', playerName.trim());
+        sessionStorage.setItem('playerId', data.playerId);
         navigate(`/lobby/${data.code}`);
       } else {
         setError(data.error || 'Failed to join lobby');

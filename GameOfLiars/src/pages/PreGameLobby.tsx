@@ -102,11 +102,11 @@ export default function PreGameLobby() {
       setSessionChecked(true); // Prevent multiple checks
       
       // Clear any old player data when accessing a new lobby
-      const currentLobbyCode = localStorage.getItem('lobbyCode');
+      const currentLobbyCode = sessionStorage.getItem('lobbyCode');
       if (currentLobbyCode && currentLobbyCode !== code) {
-        localStorage.removeItem('playerId');
-        localStorage.removeItem('playerName');
-        localStorage.removeItem('lobbyCode');
+        sessionStorage.removeItem('playerId');
+        sessionStorage.removeItem('playerName');
+        sessionStorage.removeItem('lobbyCode');
       }
       
       // Check if we have a valid session by trying to fetch player info
@@ -117,8 +117,8 @@ export default function PreGameLobby() {
         setSessionChecked(true);
         
         // Check if we have stored player data first
-        const playerId = localStorage.getItem('playerId');
-        const storedPlayerName = localStorage.getItem('playerName');
+        const playerId = sessionStorage.getItem('playerId');
+        const storedPlayerName = sessionStorage.getItem('playerName');
         
         console.log('Stored player data:', { playerId, storedPlayerName });
         
@@ -381,7 +381,7 @@ export default function PreGameLobby() {
     try {
       setError('');
       
-      const playerId = localStorage.getItem('playerId'); // Keep this for now
+      const playerId = sessionStorage.getItem('playerId'); // Keep this for now
       
       const response = await fetch(`${API_URL}/api/lobby/${lobbyCode}/settings`, {
         method: 'PUT',
@@ -547,9 +547,9 @@ export default function PreGameLobby() {
       
       if (data.success) {
         // Store player info
-        localStorage.setItem('playerId', data.playerId);
-        localStorage.setItem('playerName', tempPlayerName.trim());
-        localStorage.setItem('lobbyCode', code); // Store current lobby code
+        sessionStorage.setItem('playerId', data.playerId);
+        sessionStorage.setItem('playerName', tempPlayerName.trim());
+        sessionStorage.setItem('lobbyCode', code); // Store current lobby code
         
         setPlayerName(tempPlayerName.trim());
         setShowNamePopup(false);
