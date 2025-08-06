@@ -18,7 +18,27 @@ const PORT = process.env.PORT || 5051;
 
 // Middleware
 app.use(cors({
-  origin: true, // Allow all origins during development
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost and IP addresses for development
+    if (origin.includes('localhost') || 
+        origin.includes('127.0.0.1') || 
+        origin.includes('192.168.1.200') ||
+        origin.includes('172.16.90.208') ||
+        origin.includes('172.16.92.228')) {
+      return callback(null, true);
+    }
+    
+    // Allow Vercel domains
+    if (origin.includes('vercel.app') || 
+        origin.includes('game-of-liars.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
