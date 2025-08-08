@@ -8,8 +8,17 @@ export function setupSocket(server) {
                 // Allow requests with no origin
                 if (!origin) return callback(null, true);
                 
-                // Allow localhost and IP addresses for development
+                // Allow Vercel domain
                 if (origin.includes('game-of-liars.vercel.app')) {
+                    return callback(null, true);
+                }
+
+                // Allow local development origins (localhost and LAN IPs)
+                if (
+                    origin.includes('localhost') ||
+                    origin.includes('127.0.0.1') ||
+                    /https?:\/\/[\d.]+(?::\d+)?$/.test(origin)
+                ) {
                     return callback(null, true);
                 }
                 
@@ -60,20 +69,10 @@ export function setupSocket(server) {
                             }
                         }, 30000); // 30 seconds
                     } else if (player) {
-                        // Regular player disconnected - remove them from the lobby and notify others
-                        lobby.removePlayer(player);
-                        
-                        // Notify other players
-                        socket.to(socket.lobbyCode).emit('playerLeft', {
-                            playerName: socket.playerName
-                        });
-                        
-                        // Check if lobby should be deleted (no players left)
-                        if (lobby.shouldBeDeleted()) {
-                            io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'Lobby closed because all players have left.' });
-                            activeLobbies.delete(socket.lobbyCode);
-                            console.log(`Lobby ${socket.lobbyCode} closed due to all players leaving.`);
-                        }
+                        // Regular player disconnected - DO NOT remove them immediately.
+                        // Keep team assignments intact to survive page transitions/reconnects.
+                        console.log(`Player ${socket.playerName} transiently disconnected from lobby ${socket.lobbyCode} - preserving team assignment.`);
+                        // Optionally, could emit a 'playerDisconnected' event here if UI needs it.
                     }
                 }
             }

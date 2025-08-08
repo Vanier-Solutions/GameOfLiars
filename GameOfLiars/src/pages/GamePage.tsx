@@ -140,12 +140,35 @@ export default function GamePage() {
       setLobbyCode(code);
       
       const nameFromStorage = localStorage.getItem('playerName');
-      if (nameFromStorage) {
+      const playerIdFromStorage = localStorage.getItem('playerId');
+      
+      if (nameFromStorage && playerIdFromStorage) {
         setPlayerName(nameFromStorage);
-        fetchGameData(code, nameFromStorage);
+        
+        // Refresh session by making a quick request to the lobby endpoint
+        const refreshSession = async () => {
+          try {
+            await fetch(`${API_URL}/api/lobby/${code}`, {
+              credentials: 'include',
+              headers: {
+                'x-player-id': playerIdFromStorage,
+                'x-player-name': nameFromStorage,
+                'x-lobby-code': code
+              }
+            });
+          } catch (error) {
+          }
+        };
+        
+        // Refresh session first, then fetch game data
+        refreshSession().then(() => {
+          setTimeout(() => {
+            fetchGameData(code, nameFromStorage);
+          }, 100);
+        });
       } else {
-        setError('Player not found. Please rejoin the lobby.');
-        setLoading(false);
+        // If localStorage data is missing, try to redirect back to lobby
+        window.location.href = `/lobby/${code}`;
       }
     }
   }, [code]);
@@ -316,14 +339,46 @@ export default function GamePage() {
     try {
       // Fetch game state
       const gameResponse = await fetch(`${API_URL}/api/game/${code}/state`, {
-        credentials: 'include' // Add session support
+        credentials: 'include',
+        headers: {
+          'x-player-id': localStorage.getItem('playerId') || '',
+          'x-player-name': localStorage.getItem('playerName') || '',
+          'x-lobby-code': code
+        }
       });
+      
+      if (gameResponse.status === 403) {
+        setError('You need to join this lobby to view it. Please return to the lobby.');
+        setLoading(false);
+        // Redirect back to lobby after a short delay
+        setTimeout(() => {
+          window.location.href = `/lobby/${code}`;
+        }, 2000);
+        return;
+      }
+      
       const gameData = await gameResponse.json();
       
       // Fetch lobby data to get team information
       const lobbyResponse = await fetch(`${API_URL}/api/lobby/${code}`, {
-        credentials: 'include' // Add session support
+        credentials: 'include',
+        headers: {
+          'x-player-id': localStorage.getItem('playerId') || '',
+          'x-player-name': localStorage.getItem('playerName') || '',
+          'x-lobby-code': code
+        }
       });
+      
+      if (lobbyResponse.status === 403) {
+        setError('You need to join this lobby to view it. Please return to the lobby.');
+        setLoading(false);
+        // Redirect back to lobby after a short delay
+        setTimeout(() => {
+          window.location.href = `/lobby/${code}`;
+        }, 2000);
+        return;
+      }
+      
       const lobbyData = await lobbyResponse.json();
       
       if (gameData.success && lobbyData.success) {
@@ -679,12 +734,20 @@ export default function GamePage() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-red-600">Error</h2>
           <p className="text-gray-700 mt-2">{error}</p>
-          <Button 
-            onClick={() => window.location.href = '/'}
-            className="mt-4"
-          >
-            Return Home
-          </Button>
+          <div className="mt-4 space-x-2">
+            <Button 
+              onClick={() => window.location.href = `/lobby/${code}`}
+              className="mr-2"
+            >
+              Return to Lobby
+            </Button>
+            <Button 
+              onClick={() => window.location.href = '/'}
+              variant="outline"
+            >
+              Return Home
+            </Button>
+          </div>
         </div>
       </div>
     );

@@ -49,7 +49,7 @@ export function setupGameEvents(io, activeLobbies) {
         const lobby = activeLobbies.get(lobbyCode);
         if (!lobby) return;
         
-        io.to(lobbyCode).emit('teamUpdate', {
+        const teamData = {
             blueTeam: lobby.getBlueTeam().map(p => ({ name: p.getName(), role: p.getRole() })),
             redTeam: lobby.getRedTeam().map(p => ({ name: p.getName(), role: p.getRole() })),
             spectators: lobby.getSpectators().map(p => ({ name: p.getName(), role: p.getRole() })),
@@ -57,7 +57,9 @@ export function setupGameEvents(io, activeLobbies) {
                 blue: lobby.getBlueCaptain()?.getName() || null,
                 red: lobby.getRedCaptain()?.getName() || null
             }
-        });
+        };
+        
+        io.to(lobbyCode).emit('teamUpdate', teamData);
     }
     
     function broadcastSettingsUpdate(lobbyCode, settings) {

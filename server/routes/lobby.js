@@ -54,18 +54,7 @@ router.post("/create", (req, res) => {
         };
         
         // Explicitly save the session
-        req.session.save((err) => {
-            if (err) {
-                console.error('Session save error:', err);
-            } else {
-                console.log('Session saved successfully');
-            }
-        });
-        
-        console.log('CREATE LOBBY - Session set:');
-        console.log('- Session ID:', req.sessionID);
-        console.log('- Session user:', req.session.user);
-        console.log('- Host ID:', host.getId());
+        req.session.save(() => {});
         
         const response = {
             success: true,
@@ -127,11 +116,7 @@ router.post("/join", (req, res) => {
         };
         
         // Explicitly save the session
-        req.session.save((err) => {
-            if (err) {
-                console.error('Session save error:', err);
-            }
-        });
+        req.session.save(() => {});
 
         // Broadcast team update
         const gameEvents = req.app.locals.gameEvents;
@@ -226,40 +211,45 @@ router.get('/:code', optionalAuth, (req, res) => {
         const { code } = req.params;
         const upperCode = code.toUpperCase();
         
-        // Debug logging
-        console.log('GET /api/lobby/:code - Debug info:');
-        console.log('- Code:', upperCode);
-        console.log('- Session:', req.session);
-        console.log('- User:', req.user);
-        console.log('- Session ID:', req.sessionID);
-        console.log('- Cookies:', req.headers.cookie);
-        
         const lobby = activeLobbies.get(upperCode);
         
         if (!lobby) {
             return res.status(404).json({ error: 'Lobby not found' });
         }
         
-        // If user is authenticated, check if they belong to this lobby
+        // More robust authentication check
+        let isAuthenticated = false;
+        
+        // Method 1: Check if user is authenticated via session
         if (req.user) {
-            console.log('- User is authenticated');
-            // Allow access if the user's session lobby code matches OR they're a player in the lobby
             const isInCorrectLobby = req.user.lobbyCode === upperCode;
             const isPlayerInLobby = lobby.hasPlayerId(req.user.id);
-            
-            console.log('- isInCorrectLobby:', isInCorrectLobby);
-            console.log('- isPlayerInLobby:', isPlayerInLobby);
-            
-            if (!isInCorrectLobby && !isPlayerInLobby) {
-                return res.status(403).json({ 
-                    error: 'You are not a player in this lobby',
-                    needsToJoin: true,
-                    lobbyCode: upperCode
-                });
+            if (isInCorrectLobby || isPlayerInLobby) {
+                isAuthenticated = true;
             }
-        } else {
-            console.log('- User is NOT authenticated');
-            // If user is not authenticated, they need to join
+        }
+        
+        // Method 2: Try header-based authentication if session failed
+        if (!isAuthenticated) {
+            const headerPlayerId = req.get('x-player-id');
+            const headerPlayerName = req.get('x-player-name');
+            
+            if (headerPlayerId || headerPlayerName) {
+                let player = null;
+                if (headerPlayerId) {
+                    player = lobby.getPlayerById(headerPlayerId);
+                }
+                if (!player && headerPlayerName) {
+                    player = lobby.getPlayerByName(headerPlayerName);
+                }
+                
+                if (player) {
+                    isAuthenticated = true;
+                }
+            }
+        }
+        
+        if (!isAuthenticated) {
             return res.status(403).json({ 
                 error: 'You need to join this lobby to view it',
                 needsToJoin: true,
@@ -288,7 +278,6 @@ router.get('/:code', optionalAuth, (req, res) => {
         
         res.json(response);
     } catch (error) {
-        console.error('Error getting lobby info:', error);
         res.status(500).json({ error: 'Failed to get lobby info' });
     }
 });
@@ -361,34 +350,59 @@ router.put('/:code/settings', requireAuth, (req, res) => {
 router.delete('/:code', optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
-        const player = req.user;
-
-        if (!player) {
-            return res.status(401).json({ success: false, error: 'Unauthorized' });
-        }
-
+        
         const lobby = activeLobbies.get(code.toUpperCase());
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
-
-        if (lobby.getHost().getId() !== player.id) {
+        
+        // More robust authentication - try multiple methods
+        let player = null;
+        
+        // Method 1: Try session user
+        if (req.user) {
+            player = lobby.getPlayerById(req.user.id);
+        }
+        
+        // Method 2: Try headers if session failed
+        if (!player) {
+            const headerPlayerId = req.get('x-player-id');
+            const headerPlayerName = req.get('x-player-name');
+            
+            if (headerPlayerId) {
+                player = lobby.getPlayerById(headerPlayerId);
+            }
+            
+            if (!player && headerPlayerName) {
+                player = lobby.getPlayerByName(headerPlayerName);
+            }
+        }
+        
+        // Method 3: Try to find by session user name if ID didn't work
+        if (!player && req.user && req.user.name) {
+            player = lobby.getPlayerByName(req.user.name);
+        }
+        
+        if (!player) {
+            return res.status(401).json({ success: false, error: 'Unauthorized - Player not found in lobby' });
+        }
+        
+        // Verify the player is the host
+        if (lobby.getHost().getId() !== player.getId()) {
             return res.status(403).json({ success: false, error: 'Only the host can end the lobby.' });
         }
-
+        
         // Mark lobby as intentionally ended to prevent disconnect timeout
         lobby.markAsIntentionallyEnded();
-
+        
         // Use gameEvents to notify clients and close sockets
         if (req.app.locals.gameEvents) {
             req.app.locals.gameEvents.broadcastLobbyClosed(code, 'The host has ended the lobby.');
         }
-
+        
         activeLobbies.delete(code.toUpperCase());
-        console.log(`Lobby ${code} was ended by the host.`);
         res.json({ success: true, message: 'Lobby has been successfully ended.' });
     } catch (error) {
-        console.error('Error ending lobby:', error);
         res.status(500).json({ success: false, error: 'Failed to end lobby' });
     }
 });

@@ -66,7 +66,6 @@ router.put('/team', optionalAuth, (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error updating team assignment:', error);
         res.status(500).json({ error: 'Failed to update team assignment' });
     }
 });

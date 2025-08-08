@@ -194,65 +194,52 @@ router.get("/:code/state", optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
         
-        // Debug logging
-        console.log('GET /api/game/:code/state - Debug info:');
-        console.log('- Code:', code);
-        console.log('- Session ID:', req.sessionID);
-        console.log('- User:', req.user);
-        console.log('- Origin:', req.headers.origin);
-        console.log('- Cookies:', req.headers.cookie);
-        
         const lobby = activeLobbies.get(code);
-        
         if (!lobby) {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // More lenient authentication - similar to lobby endpoint
         if (req.user) {
-            // Allow access if the user's session lobby code matches OR they're a player in the lobby
             const isInCorrectLobby = req.user.lobbyCode === code;
             const isPlayerInLobby = lobby.hasPlayerId(req.user.id);
-            
             if (!isInCorrectLobby && !isPlayerInLobby) {
-                return res.status(403).json({ 
-                    success: false, 
-                    error: 'You are not a player in this lobby',
-                    needsToJoin: true,
-                    lobbyCode: code
-                });
+                const playerByName = lobby.getPlayerByName(req.user.name);
+                if (!playerByName) {
+                    return res.status(403).json({ success: false, error: 'You are not a player in this lobby', needsToJoin: true, lobbyCode: code });
+                }
             }
         } else {
-            // If no session, still allow access but with limited info
-            console.log(`Game state accessed without session for lobby ${code}`);
+            const headerPlayerId = req.get('x-player-id');
+            const headerPlayerName = req.get('x-player-name');
+            if (headerPlayerId || headerPlayerName) {
+                let player = null;
+                if (headerPlayerId) { player = lobby.getPlayerById(headerPlayerId); }
+                if (!player && headerPlayerName) { player = lobby.getPlayerByName(headerPlayerName); }
+                if (!player) { return res.status(403).json({ success: false, error: 'You are not a player in this lobby', needsToJoin: true, lobbyCode: code }); }
+            }
         }
         
         const gameState = lobby.getGameState();
         const currentRound = gameState.currentRound;
-        
         let roundData = null;
         if (currentRound) {
             roundData = {
                 roundNumber: currentRound.getRoundNumber(),
                 question: currentRound.getQuestion(),
                 roundStatus: currentRound.getRoundStatus(),
-                roundStartTime: currentRound.roundStartTime,
-                blueAnswer: currentRound.getTeamAnswer('blue'),
-                redAnswer: currentRound.getTeamAnswer('red'),
-                winner: currentRound.getWinner()
+                roundStartTime: currentRound.roundStartTime || undefined
             };
         }
         
         res.json({
             success: true,
+            code: lobby.getCode(),
             gamePhase: lobby.gamePhase,
-            currentRoundNumber: gameState.currentRoundNumber,
             scores: gameState.scores,
+            roundData: roundData,
             settings: lobby.getSettings(),
-            roundData: roundData
         });
     } catch (error) {
-        console.error('Error fetching game state:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

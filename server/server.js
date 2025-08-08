@@ -22,6 +22,11 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
+    // Allow Vercel domain for production
+    if (origin === 'https://game-of-liars.vercel.app') {
+      return callback(null, true);
+    }
+    
     // Allow localhost and IP addresses for development
     if (origin.includes('localhost') || 
         origin.includes('127.0.0.1') || 
@@ -41,7 +46,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'x-player-id', 'x-player-name', 'x-lobby-code'],
   exposedHeaders: ['Set-Cookie']
 }));
 
@@ -58,24 +63,16 @@ app.use(session({
   resave: false,
   saveUninitialized: true,
   cookie: {
-    secure: true, // Must be true for HTTPS
+    secure: process.env.NODE_ENV === 'production', // Only secure in production
     httpOnly: false, // Allow JavaScript access for debugging
     maxAge: 4 * 60 * 60 * 1000, // 4 hours
-    sameSite: 'none' // Required for cross-domain cookies
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Conditional sameSite
   },
   name: 'connect.sid'
 }));
 
 
 app.use(express.json());
-
-// Debug middleware to log session info
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - Session ID: ${req.sessionID}, User: ${req.session?.user?.name || 'none'}`);
-  console.log(`  Cookies: ${JSON.stringify(req.headers.cookie)}`);
-  console.log(`  Origin: ${req.headers.origin}`);
-  next();
-});
 
 // Routes
 app.use('/api/lobby', lobbyRoutes);
