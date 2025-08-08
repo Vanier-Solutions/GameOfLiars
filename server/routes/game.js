@@ -15,16 +15,31 @@ router.post("/:code/start", optionalAuth, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify host using session - more lenient approach
+        // Robust player finding - try session first, then headers
         let player = null;
-        if (req.user) {
-            // Try to find player by ID first
+        
+        // Method 1: Try session user
+        if (req.user && req.user.id) {
             player = lobby.getPlayerById(req.user.id);
+        }
+        
+        // Method 2: Try header-based authentication if session failed
+        if (!player) {
+            const headerPlayerId = req.get('x-player-id');
+            const headerPlayerName = req.get('x-player-name');
             
-            // If not found by ID, try to find by name and lobby code match
-            if (!player && req.user.lobbyCode === code) {
-                player = lobby.getPlayerByName(req.user.name);
+            if (headerPlayerId) {
+                player = lobby.getPlayerById(headerPlayerId);
             }
+            
+            if (!player && headerPlayerName) {
+                player = lobby.getPlayerByName(headerPlayerName);
+            }
+        }
+        
+        // Method 3: Try to find by session user name if ID didn't work
+        if (!player && req.user && req.user.name) {
+            player = lobby.getPlayerByName(req.user.name);
         }
         
         if (!player || player.getName() !== lobby.getHost().getName()) {
@@ -183,8 +198,33 @@ router.post("/:code/round/next", optionalAuth, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify host using session
-        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        // Robust player finding - try session first, then headers
+        let player = null;
+        
+        // Method 1: Try session user
+        if (req.user && req.user.id) {
+            player = lobby.getPlayerById(req.user.id);
+        }
+        
+        // Method 2: Try header-based authentication if session failed
+        if (!player) {
+            const headerPlayerId = req.get('x-player-id');
+            const headerPlayerName = req.get('x-player-name');
+            
+            if (headerPlayerId) {
+                player = lobby.getPlayerById(headerPlayerId);
+            }
+            
+            if (!player && headerPlayerName) {
+                player = lobby.getPlayerByName(headerPlayerName);
+            }
+        }
+        
+        // Method 3: Try to find by session user name if ID didn't work
+        if (!player && req.user && req.user.name) {
+            player = lobby.getPlayerByName(req.user.name);
+        }
+        
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can start next round' });
         }

@@ -147,7 +147,7 @@ export default function GamePage() {
           method: 'GET',
           headers: {
             'x-player-id': localStorage.getItem('playerId') || '',
-            'x-player-name': playerName,
+            'x-player-name': localStorage.getItem('playerName') || playerName,
             'x-lobby-code': code
           }
         });
@@ -208,7 +208,12 @@ export default function GamePage() {
             // Use a session-based approach to refresh the session
             await fetch(`${API_URL}/api/lobby/${code}`, {
               credentials: 'include',
-              method: 'GET'
+              method: 'GET',
+              headers: {
+                'x-player-id': localStorage.getItem('playerId') || '',
+                'x-player-name': nameFromStorage,
+                'x-lobby-code': code
+              }
             });
           } catch (error) {
             // If session refresh fails, try to re-establish session
@@ -390,8 +395,11 @@ export default function GamePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-player-id': localStorage.getItem('playerId') || '',
+          'x-player-name': playerName,
+          'x-lobby-code': lobbyCode
         },
-        credentials: 'include' // Use session for auth
+        credentials: 'include'
       });
 
       const data = await response.json();

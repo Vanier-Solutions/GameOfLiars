@@ -163,7 +163,7 @@ export default function PreGameLobby() {
             credentials: 'include', // Use session for auth when available
             headers: {
               'x-player-id': localStorage.getItem('playerId') || '',
-              'x-player-name': localStorage.getItem('playerName') || '',
+              'x-player-name': localStorage.getItem('playerName') || storedPlayerName || '',
               'x-lobby-code': code
             }
           });
@@ -256,7 +256,12 @@ export default function PreGameLobby() {
               // Use a session-based approach to refresh the session
               await fetch(`${API_URL}/api/lobby/${lobbyCode}`, {
                 credentials: 'include',
-                method: 'GET'
+                method: 'GET',
+                headers: {
+                  'x-player-id': localStorage.getItem('playerId') || '',
+                  'x-player-name': localStorage.getItem('playerName') || '',
+                  'x-lobby-code': lobbyCode
+                }
               });
             } catch (error) {
               // If session refresh fails, try to re-establish session
