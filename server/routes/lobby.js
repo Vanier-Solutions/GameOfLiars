@@ -211,13 +211,6 @@ router.get('/:code', optionalAuth, (req, res) => {
         const { code } = req.params;
         const upperCode = code.toUpperCase();
         
-        // Debug session info
-        console.log('GET lobby - Session info:', {
-            sessionID: req.sessionID,
-            user: req.user,
-            userAgent: req.headers['user-agent']
-        });
-        
         const lobby = activeLobbies.get(upperCode);
         
         if (!lobby) {
@@ -231,12 +224,6 @@ router.get('/:code', optionalAuth, (req, res) => {
         if (req.user) {
             const isInCorrectLobby = req.user.lobbyCode === upperCode;
             const isPlayerInLobby = lobby.hasPlayerId(req.user.id);
-            console.log('GET lobby - Auth check:', {
-                isInCorrectLobby,
-                isPlayerInLobby,
-                userLobbyCode: req.user.lobbyCode,
-                requestedCode: upperCode
-            });
             if (isInCorrectLobby || isPlayerInLobby) {
                 isAuthenticated = true;
             }
@@ -257,22 +244,18 @@ router.get('/:code', optionalAuth, (req, res) => {
                 }
                 
                 if (player) {
-                    console.log('GET lobby - Header auth successful:', player.getName());
                     isAuthenticated = true;
                 }
             }
         }
         
         if (!isAuthenticated) {
-            console.log('GET lobby - Authentication failed');
             return res.status(403).json({ 
                 error: 'You need to join this lobby to view it',
                 needsToJoin: true,
                 lobbyCode: upperCode
             });
         }
-        
-        console.log('GET lobby - Authentication successful');
         
         const response = {
             success: true,

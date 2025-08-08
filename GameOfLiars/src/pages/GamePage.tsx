@@ -135,6 +135,58 @@ export default function GamePage() {
   // Initialize Socket.io connection
   const { isConnected, lastMessage, sendMessage } = useWebSocket(lobbyCode, playerName);
 
+  // Session refresh mechanism for game page
+  useEffect(() => {
+    const refreshSessionForGame = async () => {
+      if (!code || !playerName) return;
+      
+      try {
+        // First, try to refresh the session by making a request to the lobby endpoint
+        const response = await fetch(`${API_URL}/api/lobby/${code}`, {
+          credentials: 'include',
+          method: 'GET',
+          headers: {
+            'x-player-id': localStorage.getItem('playerId') || '',
+            'x-player-name': playerName,
+            'x-lobby-code': code
+          }
+        });
+        
+        if (!response.ok) {
+          // If the session is lost, try to re-establish it
+          console.log('Session lost, attempting to re-establish...');
+          const rejoinResponse = await fetch(`${API_URL}/api/lobby/join`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              code: code,
+              playerName: playerName
+            }),
+          });
+          
+          if (!rejoinResponse.ok) {
+            console.log('Failed to re-establish session, redirecting to lobby');
+            window.location.href = `/lobby/${code}`;
+            return;
+          }
+          
+          console.log('Session re-established successfully');
+        } else {
+          console.log('Session is valid');
+        }
+      } catch (error) {
+        console.error('Error refreshing session:', error);
+        // If session refresh fails, redirect back to lobby
+        window.location.href = `/lobby/${code}`;
+      }
+    };
+    
+    refreshSessionForGame();
+  }, [code, playerName]);
+
   useEffect(() => {
     if (code) {
       setLobbyCode(code);
@@ -345,6 +397,35 @@ export default function GamePage() {
     } catch (err) {
       console.error('Failed to end round:', err);
       setError('Failed to end round');
+    }
+  };
+
+  const handleTimeout = async () => {
+    if (!isHost) return;
+    
+    try {
+      setError('');
+      
+      const response = await fetch(`${API_URL}/api/game/${lobbyCode}/round/timeout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-player-id': localStorage.getItem('playerId') || '',
+          'x-player-name': playerName,
+          'x-lobby-code': lobbyCode
+        },
+        credentials: 'include',
+        body: JSON.stringify({})
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        setError(data.error || 'Failed to trigger timeout');
+      }
+    } catch (err) {
+      console.error('Failed to trigger timeout:', err);
+      setError('Failed to trigger timeout');
     }
   };
 
@@ -559,9 +640,12 @@ export default function GamePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-player-id': localStorage.getItem('playerId') || '',
+          'x-player-name': playerName,
+          'x-lobby-code': lobbyCode
         },
-        credentials: 'include', // Use session for auth
-        body: JSON.stringify({ lobbyCode }) // Remove playerId - backend will get it from session
+        credentials: 'include',
+        body: JSON.stringify({})
       });
 
       const data = await response.json();

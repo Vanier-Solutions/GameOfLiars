@@ -60,17 +60,32 @@ router.post("/:code/round/start", optionalAuth, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Debug session info
-        console.log('Start round - Session info:', {
-            sessionID: req.sessionID,
-            user: req.user,
-            userAgent: req.headers['user-agent']
-        });
+        // Robust player finding - try session first, then headers
+        let player = null;
         
-        // Verify host using session
-        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
-        console.log('Start round - Player found:', player ? player.getName() : 'null');
-        console.log('Start round - Host name:', lobby.getHost().getName());
+        // Method 1: Try session user
+        if (req.user && req.user.id) {
+            player = lobby.getPlayerById(req.user.id);
+        }
+        
+        // Method 2: Try header-based authentication if session failed
+        if (!player) {
+            const headerPlayerId = req.get('x-player-id');
+            const headerPlayerName = req.get('x-player-name');
+            
+            if (headerPlayerId) {
+                player = lobby.getPlayerById(headerPlayerId);
+            }
+            
+            if (!player && headerPlayerName) {
+                player = lobby.getPlayerByName(headerPlayerName);
+            }
+        }
+        
+        // Method 3: Try to find by session user name if ID didn't work
+        if (!player && req.user && req.user.name) {
+            player = lobby.getPlayerByName(req.user.name);
+        }
         
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can start rounds' });
@@ -104,23 +119,14 @@ router.post("/:code/round/answer", optionalAuth, (req, res) => {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Debug session info for mobile
-        console.log('Submit answer - Session info:', {
-            sessionID: req.sessionID,
-            user: req.user,
-            userAgent: req.headers['user-agent']
-        });
-        
         // Find player using session
         let player = req.user ? lobby.getPlayerById(req.user.id) : null;
-        console.log('Submit answer - Player found:', player ? player.getName() : 'null');
         
         // Fallback: if session is lost, try to find player by name from headers
         if (!player) {
             const playerName = req.get('x-player-name');
             if (playerName) {
                 player = lobby.getPlayerByName(playerName);
-                console.log('Submit answer - Fallback player found:', player ? player.getName() : 'null');
             }
         }
         
@@ -322,8 +328,33 @@ router.post("/:code/round/timeout", optionalAuth, (req, res) => {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
-        // Verify host using session
-        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        // Robust player finding - try session first, then headers
+        let player = null;
+        
+        // Method 1: Try session user
+        if (req.user && req.user.id) {
+            player = lobby.getPlayerById(req.user.id);
+        }
+        
+        // Method 2: Try header-based authentication if session failed
+        if (!player) {
+            const headerPlayerId = req.get('x-player-id');
+            const headerPlayerName = req.get('x-player-name');
+            
+            if (headerPlayerId) {
+                player = lobby.getPlayerById(headerPlayerId);
+            }
+            
+            if (!player && headerPlayerName) {
+                player = lobby.getPlayerByName(headerPlayerName);
+            }
+        }
+        
+        // Method 3: Try to find by session user name if ID didn't work
+        if (!player && req.user && req.user.name) {
+            player = lobby.getPlayerByName(req.user.name);
+        }
+        
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can trigger round timeout' });
         }
