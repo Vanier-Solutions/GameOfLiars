@@ -81,7 +81,7 @@ export function setupSocket(server) {
 
         // Join lobby room
         socket.on('joinLobby', (data) => {
-            const { code, playerName } = data;
+            const { code, playerName, playerId } = data;
             
             const lobby = activeLobbies.get(code.toUpperCase());
             
@@ -90,14 +90,22 @@ export function setupSocket(server) {
                 return;
             }
 
-            const player = lobby.getPlayerByName(playerName);
+            // Prefer identifying player by ID, fallback to name
+            let player = null;
+            if (playerId) {
+                player = lobby.getPlayerById(playerId);
+            }
+            if (!player && playerName) {
+                player = lobby.getPlayerByName(playerName);
+            }
+            
             if (!player) {
                 socket.emit('error', { message: 'Player not found in lobby' });
                 return;
             }
 
             // If the host has reconnected, clear the disconnect timeout and notify players
-            if (lobby.getHost().getName() === playerName && lobby.hostDisconnectTimeout) {
+            if (lobby.getHost().getName() === player.getName() && lobby.hostDisconnectTimeout) {
                 clearTimeout(lobby.hostDisconnectTimeout);
                 lobby.hostDisconnectTimeout = null;
                 io.to(code.toUpperCase()).emit('hostReconnected', { message: 'The host has reconnected.' });
@@ -111,11 +119,11 @@ export function setupSocket(server) {
             // Join the lobby room
             socket.join(code.toUpperCase());
             socket.lobbyCode = code.toUpperCase();
-            socket.playerName = playerName;
+            socket.playerName = player.getName();
 
             // Notify others that player joined
             socket.to(code.toUpperCase()).emit('playerJoined', {
-                playerName: playerName,
+                playerName: player.getName(),
                 team: player.getTeam(),
                 role: player.getRole()
             });

@@ -224,16 +224,17 @@ router.get('/:code/player/:playerId', (req, res) => {
 router.get('/:code', optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
+        const upperCode = code.toUpperCase();
         
         // Debug logging
         console.log('GET /api/lobby/:code - Debug info:');
-        console.log('- Code:', code);
+        console.log('- Code:', upperCode);
         console.log('- Session:', req.session);
         console.log('- User:', req.user);
         console.log('- Session ID:', req.sessionID);
         console.log('- Cookies:', req.headers.cookie);
         
-        const lobby = activeLobbies.get(code);
+        const lobby = activeLobbies.get(upperCode);
         
         if (!lobby) {
             return res.status(404).json({ error: 'Lobby not found' });
@@ -243,7 +244,7 @@ router.get('/:code', optionalAuth, (req, res) => {
         if (req.user) {
             console.log('- User is authenticated');
             // Allow access if the user's session lobby code matches OR they're a player in the lobby
-            const isInCorrectLobby = req.user.lobbyCode === code;
+            const isInCorrectLobby = req.user.lobbyCode === upperCode;
             const isPlayerInLobby = lobby.hasPlayerId(req.user.id);
             
             console.log('- isInCorrectLobby:', isInCorrectLobby);
@@ -253,7 +254,7 @@ router.get('/:code', optionalAuth, (req, res) => {
                 return res.status(403).json({ 
                     error: 'You are not a player in this lobby',
                     needsToJoin: true,
-                    lobbyCode: code
+                    lobbyCode: upperCode
                 });
             }
         } else {
@@ -262,7 +263,7 @@ router.get('/:code', optionalAuth, (req, res) => {
             return res.status(403).json({ 
                 error: 'You need to join this lobby to view it',
                 needsToJoin: true,
-                lobbyCode: code
+                lobbyCode: upperCode
             });
         }
         

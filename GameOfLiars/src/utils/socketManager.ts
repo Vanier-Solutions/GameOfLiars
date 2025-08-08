@@ -59,7 +59,8 @@ class SocketManager extends EventEmitter {
         this.emit('connected');
         
         // Join lobby room
-        this.socket.emit('joinLobby', { code: lobbyCode, playerName });
+        const storedPlayerId = localStorage.getItem('playerId');
+        this.socket.emit('joinLobby', { code: lobbyCode, playerName, playerId: storedPlayerId });
       });
 
       this.socket.on('disconnect', () => {
