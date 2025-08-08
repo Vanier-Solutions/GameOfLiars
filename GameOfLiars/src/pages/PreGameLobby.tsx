@@ -253,15 +253,30 @@ export default function PreGameLobby() {
           // Ensure session is properly established before redirecting
           const ensureSession = async () => {
             try {
+              // Use a session-based approach to refresh the session
               await fetch(`${API_URL}/api/lobby/${lobbyCode}`, {
                 credentials: 'include',
-                headers: {
-                  'x-player-id': localStorage.getItem('playerId') || '',
-                  'x-player-name': localStorage.getItem('playerName') || '',
-                  'x-lobby-code': lobbyCode
-                }
+                method: 'GET'
               });
             } catch (error) {
+              // If session refresh fails, try to re-establish session
+              try {
+                await fetch(`${API_URL}/api/lobby/join`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify({
+                    code: lobbyCode,
+                    playerName: localStorage.getItem('playerName')
+                  }),
+                });
+              } catch (rejoinError) {
+                // If rejoin fails, redirect back to lobby
+                window.location.href = `/lobby/${lobbyCode}`;
+                return;
+              }
             }
           };
           

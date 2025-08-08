@@ -148,15 +148,30 @@ export default function GamePage() {
         // Refresh session by making a quick request to the lobby endpoint
         const refreshSession = async () => {
           try {
+            // Use a session-based approach to refresh the session
             await fetch(`${API_URL}/api/lobby/${code}`, {
               credentials: 'include',
-              headers: {
-                'x-player-id': playerIdFromStorage,
-                'x-player-name': nameFromStorage,
-                'x-lobby-code': code
-              }
+              method: 'GET'
             });
           } catch (error) {
+            // If session refresh fails, try to re-establish session
+            try {
+              await fetch(`${API_URL}/api/lobby/join`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                  code: code,
+                  playerName: nameFromStorage
+                }),
+              });
+            } catch (rejoinError) {
+              // If rejoin fails, redirect back to lobby
+              window.location.href = `/lobby/${code}`;
+              return;
+            }
           }
         };
         
