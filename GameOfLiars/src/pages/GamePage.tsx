@@ -265,32 +265,11 @@ export default function GamePage() {
           // Don't auto-redirect, let host show match summary
           break;
         case 'gameStarted':
-          // Refresh session and game data when game starts
+          // Refresh game data when game starts
           setGameEnded(false);
           setAllRoundsResults([]);
           if (code && playerName) {
-            // Refresh session first
-            const refreshSession = async () => {
-              try {
-                await fetch(`${API_URL}/api/lobby/${code}`, {
-                  credentials: 'include',
-                  headers: {
-                    'x-player-id': localStorage.getItem('playerId') || '',
-                    'x-player-name': localStorage.getItem('playerName') || '',
-                    'x-lobby-code': code
-                  }
-                });
-              } catch (error) {
-                // Session refresh failed, but continue with game data fetch
-              }
-            };
-            
-            // Refresh session first, then fetch game data
-            refreshSession().then(() => {
-              setTimeout(() => {
-                fetchGameData(code, playerName);
-              }, 100);
-            });
+            fetchGameData(code, playerName);
           }
           break;
         case 'lobbyClosed':
@@ -590,25 +569,6 @@ export default function GamePage() {
     try {
       setError('');
       
-      // Refresh session before submitting answer
-      const refreshSession = async () => {
-        try {
-          await fetch(`${API_URL}/api/lobby/${lobbyCode}`, {
-            credentials: 'include',
-            headers: {
-              'x-player-id': localStorage.getItem('playerId') || '',
-              'x-player-name': localStorage.getItem('playerName') || '',
-              'x-lobby-code': lobbyCode
-            }
-          });
-        } catch (error) {
-          // Session refresh failed, but continue with answer submission
-        }
-      };
-      
-      // Refresh session first, then submit answer
-      await refreshSession();
-      
       const response = await fetch(`${API_URL}/api/game/${lobbyCode}/round/answer`, {
         method: 'POST',
         headers: {
@@ -640,25 +600,6 @@ export default function GamePage() {
     
     try {
       setError('');
-      
-      // Refresh session before submitting steal
-      const refreshSession = async () => {
-        try {
-          await fetch(`${API_URL}/api/lobby/${lobbyCode}`, {
-            credentials: 'include',
-            headers: {
-              'x-player-id': localStorage.getItem('playerId') || '',
-              'x-player-name': localStorage.getItem('playerName') || '',
-              'x-lobby-code': lobbyCode
-            }
-          });
-        } catch (error) {
-          // Session refresh failed, but continue with steal submission
-        }
-      };
-      
-      // Refresh session first, then submit steal
-      await refreshSession();
       
       const response = await fetch(`${API_URL}/api/game/${lobbyCode}/round/answer`, {
         method: 'POST',
