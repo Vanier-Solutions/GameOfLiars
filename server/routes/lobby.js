@@ -283,7 +283,7 @@ router.get('/:code', optionalAuth, (req, res) => {
 });
 
 
-router.put('/:code/settings', requireAuth, (req, res) => {
+router.put('/:code/settings', optionalAuth, (req, res) => {
     try {
         const { code } = req.params;
         const { rounds, roundLimit, maxScore } = req.body;
@@ -293,11 +293,35 @@ router.put('/:code/settings', requireAuth, (req, res) => {
             return res.status(404).json({ error: 'Lobby not found' });
         }
         
-        // Get player from session instead of request body
-        const player = lobby.getPlayerById(req.user.id);
+        // More robust player finding - try session first, then headers
+        let player = null;
+        
+        // Method 1: Try session user
+        if (req.user && req.user.id) {
+            player = lobby.getPlayerById(req.user.id);
+        }
+        
+        // Method 2: Try header-based authentication if session failed
+        if (!player) {
+            const headerPlayerId = req.get('x-player-id');
+            const headerPlayerName = req.get('x-player-name');
+            
+            if (headerPlayerId) {
+                player = lobby.getPlayerById(headerPlayerId);
+            }
+            
+            if (!player && headerPlayerName) {
+                player = lobby.getPlayerByName(headerPlayerName);
+            }
+        }
+        
+        // Method 3: Try to find by session user name if ID didn't work
+        if (!player && req.user && req.user.name) {
+            player = lobby.getPlayerByName(req.user.name);
+        }
         
         if (!player) {
-            return res.status(404).json({ error: 'Player not found' });
+            return res.status(401).json({ error: 'Authentication required' });
         }
         
         // Verify the player is the host

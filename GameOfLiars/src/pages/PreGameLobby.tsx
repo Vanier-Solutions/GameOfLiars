@@ -448,8 +448,6 @@ export default function PreGameLobby() {
     try {
       setError('');
       
-      const playerId = sessionStorage.getItem('playerId'); // Keep this for now
-      
       const response = await fetch(`${API_URL}/api/lobby/${lobbyCode}/settings`, {
         method: 'PUT',
         headers: {
@@ -458,7 +456,6 @@ export default function PreGameLobby() {
         },
         credentials: 'include', // Add session support
         body: JSON.stringify({
-          playerId: playerId, // Keep this until backend is updated
           rounds: settings.rounds,
           roundLimit: settings.roundLimit,
           maxScore: settings.maxScore
