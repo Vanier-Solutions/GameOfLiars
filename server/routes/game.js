@@ -60,8 +60,18 @@ router.post("/:code/round/start", optionalAuth, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
+        // Debug session info
+        console.log('Start round - Session info:', {
+            sessionID: req.sessionID,
+            user: req.user,
+            userAgent: req.headers['user-agent']
+        });
+        
         // Verify host using session
         const player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        console.log('Start round - Player found:', player ? player.getName() : 'null');
+        console.log('Start round - Host name:', lobby.getHost().getName());
+        
         if (!player || player.getName() !== lobby.getHost().getName()) {
             return res.status(403).json({ success: false, error: 'Only the host can start rounds' });
         }
