@@ -843,9 +843,12 @@ export default function GamePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-player-id': localStorage.getItem('playerId') || '',
+          'x-player-name': playerName,
+          'x-lobby-code': lobbyCode
         },
         credentials: 'include', // Use session for auth
-        body: JSON.stringify({ lobbyCode }) // Remove playerId - backend will get it from session
+        body: JSON.stringify({})
       });
 
       const data = await response.json();
