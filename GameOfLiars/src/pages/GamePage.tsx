@@ -184,7 +184,12 @@ export default function GamePage() {
       }
     };
     
-    refreshSessionForGame();
+    // Add a small delay to allow for page navigation
+    const timeoutId = setTimeout(() => {
+      refreshSessionForGame();
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
   }, [code, playerName]);
 
   useEffect(() => {
@@ -401,8 +406,6 @@ export default function GamePage() {
   };
 
   const handleTimeout = async () => {
-    if (!isHost) return;
-    
     try {
       setError('');
       
@@ -444,6 +447,30 @@ export default function GamePage() {
       });
       
       if (gameResponse.status === 403) {
+        // Try to refresh session before giving up
+        try {
+          console.log('Game state access denied, attempting session refresh...');
+          const refreshResponse = await fetch(`${API_URL}/api/lobby/join`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              code: code,
+              playerName: localStorage.getItem('playerName')
+            }),
+          });
+          
+          if (refreshResponse.ok) {
+            // Session refreshed, try again
+            console.log('Session refreshed, retrying game state fetch...');
+            return fetchGameData(code, currentPlayerName);
+          }
+        } catch (refreshError) {
+          console.error('Failed to refresh session:', refreshError);
+        }
+        
         setError('You need to join this lobby to view it. Please return to the lobby.');
         setLoading(false);
         // Redirect back to lobby after a short delay
@@ -466,6 +493,30 @@ export default function GamePage() {
       });
       
       if (lobbyResponse.status === 403) {
+        // Try to refresh session before giving up
+        try {
+          console.log('Lobby access denied, attempting session refresh...');
+          const refreshResponse = await fetch(`${API_URL}/api/lobby/join`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              code: code,
+              playerName: localStorage.getItem('playerName')
+            }),
+          });
+          
+          if (refreshResponse.ok) {
+            // Session refreshed, try again
+            console.log('Session refreshed, retrying lobby fetch...');
+            return fetchGameData(code, currentPlayerName);
+          }
+        } catch (refreshError) {
+          console.error('Failed to refresh session:', refreshError);
+        }
+        
         setError('You need to join this lobby to view it. Please return to the lobby.');
         setLoading(false);
         // Redirect back to lobby after a short delay

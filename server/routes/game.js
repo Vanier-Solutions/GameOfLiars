@@ -355,8 +355,9 @@ router.post("/:code/round/timeout", optionalAuth, (req, res) => {
             player = lobby.getPlayerByName(req.user.name);
         }
         
-        if (!player || player.getName() !== lobby.getHost().getName()) {
-            return res.status(403).json({ success: false, error: 'Only the host can trigger round timeout' });
+        // Allow any player to trigger timeout, not just host
+        if (!player) {
+            return res.status(401).json({ success: false, error: 'Player not found' });
         }
         
         const currentRound = lobby.gameState.currentRound;

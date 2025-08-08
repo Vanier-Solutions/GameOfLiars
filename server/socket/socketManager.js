@@ -45,29 +45,41 @@ export function setupSocket(server) {
                             return;
                         }
                         
-                        // Host disconnected: Notify players and start a 30-second timer
-                        io.to(socket.lobbyCode).emit('hostDisconnected', { 
-                            message: 'The host has disconnected. The lobby will close in 30 seconds if they do not reconnect.' 
-                        });
-
-                        lobby.hostDisconnectTimeout = setTimeout(() => {
-                            const currentLobby = activeLobbies.get(socket.lobbyCode);
-                            // Check if the lobby still exists and the timeout is still valid (host hasn't reconnected)
-                            if (currentLobby && currentLobby.hostDisconnectTimeout) {
-                                io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'Lobby closed because the host did not reconnect in time.' });
-
-                                const sockets = io.sockets.adapter.rooms.get(socket.lobbyCode);
-                                if (sockets) {
-                                    sockets.forEach(socketId => {
-                                        const sock = io.sockets.sockets.get(socketId);
-                                        if (sock) sock.disconnect(true);
-                                    });
+                        // Only trigger host disconnect if there's no existing timeout (prevents multiple triggers)
+                        if (!lobby.hostDisconnectTimeout) {
+                            // Add a small delay to allow for normal page navigation
+                            setTimeout(() => {
+                                const currentLobby = activeLobbies.get(socket.lobbyCode);
+                                // Check if host has reconnected during the delay
+                                if (currentLobby && !currentLobby.hostDisconnectTimeout) {
+                                    return; // Host has reconnected, don't trigger disconnect
                                 }
                                 
-                                activeLobbies.delete(socket.lobbyCode);
-                                console.log(`Lobby ${socket.lobbyCode} closed due to host timeout.`);
-                            }
-                        }, 30000); // 30 seconds
+                                // Host disconnected: Notify players and start a 30-second timer
+                                io.to(socket.lobbyCode).emit('hostDisconnected', { 
+                                    message: 'The host has disconnected. The lobby will close in 30 seconds if they do not reconnect.' 
+                                });
+
+                                lobby.hostDisconnectTimeout = setTimeout(() => {
+                                    const finalLobby = activeLobbies.get(socket.lobbyCode);
+                                    // Check if the lobby still exists and the timeout is still valid (host hasn't reconnected)
+                                    if (finalLobby && finalLobby.hostDisconnectTimeout) {
+                                        io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'Lobby closed because the host did not reconnect in time.' });
+
+                                        const sockets = io.sockets.adapter.rooms.get(socket.lobbyCode);
+                                        if (sockets) {
+                                            sockets.forEach(socketId => {
+                                                const sock = io.sockets.sockets.get(socketId);
+                                                if (sock) sock.disconnect(true);
+                                            });
+                                        }
+                                        
+                                        activeLobbies.delete(socket.lobbyCode);
+                                        console.log(`Lobby ${socket.lobbyCode} closed due to host timeout.`);
+                                    }
+                                }, 30000); // 30 seconds
+                            }, 2000); // 2 second delay to allow for page navigation
+                        }
                     } else if (player) {
                         // Regular player disconnected - DO NOT remove them immediately.
                         // Keep team assignments intact to survive page transitions/reconnects.
@@ -108,6 +120,7 @@ export function setupSocket(server) {
                 clearTimeout(lobby.hostDisconnectTimeout);
                 lobby.hostDisconnectTimeout = null;
                 io.to(code.toUpperCase()).emit('hostReconnected', { message: 'The host has reconnected.' });
+                console.log(`Host ${player.getName()} reconnected to lobby ${code.toUpperCase()}`);
             }
 
             // Leave any previous lobby room
