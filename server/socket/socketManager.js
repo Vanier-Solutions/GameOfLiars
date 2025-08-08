@@ -40,27 +40,31 @@ export function setupSocket(server) {
                     if (lobby.getHost().getName() === socket.playerName) {
                         // Check if lobby was intentionally ended by host
                         if (lobby.intentionallyEnded) {
-                            // Lobby was intentionally ended, don't show disconnect message
                             console.log(`Host ${socket.playerName} disconnected from intentionally ended lobby ${socket.lobbyCode}`);
                             return;
                         }
                         
-                        // Only trigger host disconnect if there's no existing timeout (prevents multiple triggers)
-                        if (!lobby.hostDisconnectTimeout) {
-                            // Add a small delay to allow for normal page navigation
-                            setTimeout(() => {
+                        // Only trigger host disconnect if there's no existing timers (prevents multiple triggers)
+                        if (!lobby.hostDisconnectTimeout && !lobby.hostDisconnectGraceTimer) {
+                            // Mark pending and start a short grace period to allow navigation reconnects
+                            lobby.hostDisconnectPending = true;
+                            lobby.hostDisconnectGraceTimer = setTimeout(() => {
                                 const currentLobby = activeLobbies.get(socket.lobbyCode);
-                                // Check if host has reconnected during the delay
-                                if (currentLobby && !currentLobby.hostDisconnectTimeout) {
-                                    return; // Host has reconnected, don't trigger disconnect
+                                if (!currentLobby) return;
+                                
+                                // If pending was cleared (host reconnected), do nothing
+                                if (!currentLobby.hostDisconnectPending) {
+                                    currentLobby.hostDisconnectGraceTimer = null;
+                                    return;
                                 }
                                 
-                                // Host disconnected: Notify players and start a 30-second timer
+                                // Announce host disconnected and start the 30s shutdown timer
                                 io.to(socket.lobbyCode).emit('hostDisconnected', { 
                                     message: 'The host has disconnected. The lobby will close in 30 seconds if they do not reconnect.' 
                                 });
+                                currentLobby.hostDisconnectedAnnounced = true;
 
-                                lobby.hostDisconnectTimeout = setTimeout(() => {
+                                currentLobby.hostDisconnectTimeout = setTimeout(() => {
                                     const finalLobby = activeLobbies.get(socket.lobbyCode);
                                     // Check if the lobby still exists and the timeout is still valid (host hasn't reconnected)
                                     if (finalLobby && finalLobby.hostDisconnectTimeout) {
@@ -78,13 +82,13 @@ export function setupSocket(server) {
                                         console.log(`Lobby ${socket.lobbyCode} closed due to host timeout.`);
                                     }
                                 }, 30000); // 30 seconds
+                                
+                                currentLobby.hostDisconnectGraceTimer = null;
                             }, 2000); // 2 second delay to allow for page navigation
                         }
                     } else if (player) {
                         // Regular player disconnected - DO NOT remove them immediately.
-                        // Keep team assignments intact to survive page transitions/reconnects.
                         console.log(`Player ${socket.playerName} transiently disconnected from lobby ${socket.lobbyCode} - preserving team assignment.`);
-                        // Optionally, could emit a 'playerDisconnected' event here if UI needs it.
                     }
                 }
             }
@@ -116,11 +120,30 @@ export function setupSocket(server) {
             }
 
             // If the host has reconnected, clear the disconnect timeout and notify players
-            if (lobby.getHost().getName() === player.getName() && lobby.hostDisconnectTimeout) {
-                clearTimeout(lobby.hostDisconnectTimeout);
-                lobby.hostDisconnectTimeout = null;
-                io.to(code.toUpperCase()).emit('hostReconnected', { message: 'The host has reconnected.' });
-                console.log(`Host ${player.getName()} reconnected to lobby ${code.toUpperCase()}`);
+            if (lobby.getHost().getName() === player.getName()) {
+                // Clear any grace timer
+                if (lobby.hostDisconnectGraceTimer) {
+                    clearTimeout(lobby.hostDisconnectGraceTimer);
+                    lobby.hostDisconnectGraceTimer = null;
+                }
+
+                // Clear pending flag
+                if (lobby.hostDisconnectPending) {
+                    lobby.hostDisconnectPending = false;
+                }
+
+                // Clear the 30s timeout if it was set
+                if (lobby.hostDisconnectTimeout) {
+                    clearTimeout(lobby.hostDisconnectTimeout);
+                    lobby.hostDisconnectTimeout = null;
+                }
+
+                // If we had announced a disconnect, notify that host reconnected
+                if (lobby.hostDisconnectedAnnounced) {
+                    lobby.hostDisconnectedAnnounced = false;
+                    io.to(code.toUpperCase()).emit('hostReconnected', { message: 'The host has reconnected.' });
+                    console.log(`Host ${player.getName()} reconnected to lobby ${code.toUpperCase()}`);
+                }
             }
 
             // Leave any previous lobby room
