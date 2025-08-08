@@ -66,7 +66,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // Only secure in production
     httpOnly: false, // Allow JavaScript access for debugging
     maxAge: 4 * 60 * 60 * 1000, // 4 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Conditional sameSite
+    sameSite: 'lax' // Use 'lax' for better mobile compatibility
   },
   name: 'connect.sid'
 }));

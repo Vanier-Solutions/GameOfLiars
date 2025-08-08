@@ -94,8 +94,26 @@ router.post("/:code/round/answer", optionalAuth, (req, res) => {
             return res.status(404).json({ success: false, error: 'Lobby not found' });
         }
         
+        // Debug session info for mobile
+        console.log('Submit answer - Session info:', {
+            sessionID: req.sessionID,
+            user: req.user,
+            userAgent: req.headers['user-agent']
+        });
+        
         // Find player using session
-        const player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        let player = req.user ? lobby.getPlayerById(req.user.id) : null;
+        console.log('Submit answer - Player found:', player ? player.getName() : 'null');
+        
+        // Fallback: if session is lost, try to find player by name from headers
+        if (!player) {
+            const playerName = req.get('x-player-name');
+            if (playerName) {
+                player = lobby.getPlayerByName(playerName);
+                console.log('Submit answer - Fallback player found:', player ? player.getName() : 'null');
+            }
+        }
+        
         if (!player) {
             return res.status(404).json({ success: false, error: 'Player not found' });
         }

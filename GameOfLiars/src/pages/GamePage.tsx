@@ -588,6 +588,7 @@ export default function GamePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-player-name': playerName // Add player name as fallback
         },
         credentials: 'include', // Use session for auth
         body: JSON.stringify({ 
@@ -620,6 +621,7 @@ export default function GamePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-player-name': playerName // Add player name as fallback
         },
         credentials: 'include', // Use session for auth
         body: JSON.stringify({ 
