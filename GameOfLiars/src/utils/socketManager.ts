@@ -51,9 +51,8 @@ class SocketManager extends EventEmitter {
     this.playerName = playerName;
 
     try {
-      this.socket = io(API_URL, {
-        transports: ['websocket']
-      });
+      const socketBase = import.meta.env.DEV ? API_URL : window.location.origin;
+      this.socket = io(socketBase);
 
       this.socket.on('connect', () => {
         this.isConnected = true;
