@@ -89,6 +89,76 @@ export function setupSocket(server) {
                     } else if (player) {
                         // Regular player disconnected - DO NOT remove them immediately.
                         console.log(`Player ${socket.playerName} transiently disconnected from lobby ${socket.lobbyCode} - preserving team assignment.`);
+
+                        // Check if host is now alone; if so, start a 3s grace then 30s shutdown sequence for host-only lobby
+                        const room = io.sockets.adapter.rooms.get(socket.lobbyCode);
+                        let nonHostPresent = false;
+                        if (room) {
+                            for (const socketId of room) {
+                                const sock = io.sockets.sockets.get(socketId);
+                                if (sock && sock.playerName && sock.playerName !== lobby.getHost().getName()) {
+                                    nonHostPresent = true;
+                                    break;
+                                }
+                            }
+                        }
+                        const hostStillConnected = !!room && Array.from(room).some(id => {
+                            const s = io.sockets.sockets.get(id);
+                            return s && s.playerName === lobby.getHost().getName();
+                        });
+
+                        if (!nonHostPresent && hostStillConnected) {
+                            if (!lobby.noPlayersLeftTimeout && !lobby.noPlayersLeftGraceTimer) {
+                                lobby.noPlayersLeftPending = true;
+                                lobby.noPlayersLeftGraceTimer = setTimeout(() => {
+                                    const currentLobby = activeLobbies.get(socket.lobbyCode);
+                                    if (!currentLobby) return;
+                                    // Recompute presence
+                                    const r = io.sockets.adapter.rooms.get(socket.lobbyCode);
+                                    let someoneElse = false;
+                                    if (r) {
+                                        for (const sid of r) {
+                                            const so = io.sockets.sockets.get(sid);
+                                            if (so && so.playerName && so.playerName !== currentLobby.getHost().getName()) {
+                                                someoneElse = true; break;
+                                            }
+                                        }
+                                    }
+                                    const hostPresent = !!r && Array.from(r).some(id => {
+                                        const s2 = io.sockets.sockets.get(id);
+                                        return s2 && s2.playerName === currentLobby.getHost().getName();
+                                    });
+                                    if (!currentLobby.noPlayersLeftPending || someoneElse || !hostPresent) {
+                                        currentLobby.noPlayersLeftGraceTimer = null;
+                                        return;
+                                    }
+                                    // Notify host only
+                                    for (const sid of r || []) {
+                                        const s3 = io.sockets.sockets.get(sid);
+                                        if (s3 && s3.playerName === currentLobby.getHost().getName()) {
+                                            s3.emit('noPlayersLeft', { message: 'No players left. The lobby will close in 30 seconds if no one rejoins.' });
+                                        }
+                                    }
+                                    currentLobby.noPlayersLeftAnnounced = true;
+                                    currentLobby.noPlayersLeftTimeout = setTimeout(() => {
+                                        const finalL = activeLobbies.get(socket.lobbyCode);
+                                        if (finalL && finalL.noPlayersLeftTimeout) {
+                                            io.to(socket.lobbyCode).emit('lobbyClosed', { message: 'Lobby closed because no players rejoined in time.' });
+                                            const sockets = io.sockets.adapter.rooms.get(socket.lobbyCode);
+                                            if (sockets) {
+                                                sockets.forEach(socketId => {
+                                                    const sock = io.sockets.sockets.get(socketId);
+                                                    if (sock) sock.disconnect(true);
+                                                });
+                                            }
+                                            activeLobbies.delete(socket.lobbyCode);
+                                            console.log(`Lobby ${socket.lobbyCode} closed due to no players left.`);
+                                        }
+                                    }, 30000);
+                                    currentLobby.noPlayersLeftGraceTimer = null;
+                                }, 3000); // 3 second delay for player reconnects
+                            }
+                        }
                     }
                 }
             }
@@ -144,6 +214,30 @@ export function setupSocket(server) {
                     io.to(code.toUpperCase()).emit('hostReconnected', { message: 'The host has reconnected.' });
                     console.log(`Host ${player.getName()} reconnected to lobby ${code.toUpperCase()}`);
                 }
+            } else {
+                // A non-host joined; clear no-players-left timers and notify host
+                if (lobby.noPlayersLeftGraceTimer) {
+                    clearTimeout(lobby.noPlayersLeftGraceTimer);
+                    lobby.noPlayersLeftGraceTimer = null;
+                }
+                if (lobby.noPlayersLeftTimeout) {
+                    clearTimeout(lobby.noPlayersLeftTimeout);
+                    lobby.noPlayersLeftTimeout = null;
+                }
+                lobby.noPlayersLeftPending = false;
+                if (lobby.noPlayersLeftAnnounced) {
+                    lobby.noPlayersLeftAnnounced = false;
+                    // Notify host to hide banner
+                    const room = io.sockets.adapter.rooms.get(code.toUpperCase());
+                    if (room) {
+                        for (const sid of room) {
+                            const s = io.sockets.sockets.get(sid);
+                            if (s && s.playerName === lobby.getHost().getName()) {
+                                s.emit('playersRejoined', { message: 'Players rejoined.' });
+                            }
+                        }
+                    }
+                }
             }
 
             // Leave any previous lobby room
@@ -162,6 +256,9 @@ export function setupSocket(server) {
                 team: player.getTeam(),
                 role: player.getRole()
             });
+
+            // Send a lightweight teamUpdate to this socket so it refreshes state on (re)join
+            socket.emit('teamUpdate', { reason: 'rejoin' });
         });
 
         // Host ends the lobby

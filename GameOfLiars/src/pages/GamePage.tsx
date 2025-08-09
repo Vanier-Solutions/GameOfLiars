@@ -250,6 +250,20 @@ export default function GamePage() {
     }
   }, [code]);
 
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && code && playerName) {
+        fetchGameData(code, playerName);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [code, playerName]);
+
   // Listen for Socket.io updates
   useEffect(() => {
     if (lastMessage) {
@@ -370,6 +384,16 @@ export default function GamePage() {
             setHostDisconnected(false);
             setToastNotification({ isVisible: true, message: 'The host has reconnected.' });
             break;
+        case 'noPlayersLeft':
+          if (isHost) {
+            setError('No players left in lobby. The lobby will close in 30 seconds if no one rejoins.');
+          }
+          break;
+        case 'playersRejoined':
+          if (isHost) {
+            setError('');
+          }
+          break;
       }
     }
   }, [lastMessage, code, playerName, playerTeam, gameData.settings.roundLimit]);

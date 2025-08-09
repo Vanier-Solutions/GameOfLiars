@@ -201,6 +201,20 @@ export default function PreGameLobby() {
     }
   }, [code, sessionChecked]);
 
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && lobbyCode) {
+        fetchLobbyData(lobbyCode);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [lobbyCode]);
+
   // Listen for Socket.io updates
   useEffect(() => {
     if (lastMessage) {
@@ -239,6 +253,17 @@ export default function PreGameLobby() {
             setHostDisconnected(false);
             // Optionally, show a toast notification
             break;
+        case 'noPlayersLeft':
+          if (isHost) {
+            setHostDisconnected(false);
+            setError('No players left in lobby. The lobby will close in 30 seconds if no one rejoins.');
+          }
+          break;
+        case 'playersRejoined':
+          if (isHost) {
+            setError('');
+          }
+          break;
         case 'lobbyClosed':
           // The lobby was closed by the server, redirect to home
           const messageData = lastMessage.data as { message?: string };
