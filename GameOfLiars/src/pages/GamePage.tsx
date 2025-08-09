@@ -619,8 +619,8 @@ export default function GamePage() {
           
           // Set team answered status
           setTeamAnswered({
-            blue: gameData.roundData.blueAnswer !== null,
-            red: gameData.roundData.redAnswer !== null
+            blue: Boolean((gameData.roundData as any).blueAnswer),
+            red:  Boolean((gameData.roundData as any).redAnswer)
           });
           
           // Set timer based on round status and start time
