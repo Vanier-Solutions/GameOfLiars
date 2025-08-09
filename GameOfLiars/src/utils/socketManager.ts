@@ -51,7 +51,9 @@ class SocketManager extends EventEmitter {
     this.playerName = playerName;
 
     try {
-      const socketBase = import.meta.env.DEV ? API_URL : window.location.origin;
+      const socketBase = import.meta.env.DEV
+        ? API_URL
+        : (import.meta.env.VITE_SOCKET_URL || 'https://gameofliars-production.up.railway.app');
       this.socket = io(socketBase);
 
       this.socket.on('connect', () => {
