@@ -563,7 +563,7 @@ export default function GamePage() {
       if (gameData.success && lobbyData.success) {
         const lobby = lobbyData.lobby;
         
-        setGameData({
+        setGameData(prev => ({
           code: code,
           host: lobby.host,
           settings: gameData.settings,
@@ -582,9 +582,9 @@ export default function GamePage() {
             }
           },
           scores: gameData.scores,
-          currentRound: gameData.currentRoundNumber,
+          currentRound: gameData.roundData?.roundNumber ?? prev.currentRound,
           gamePhase: gameData.gamePhase
-        });
+        }));
         
         // Set host status using the provided playerName or current state
         const nameToCheck = currentPlayerName || playerName;
