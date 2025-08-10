@@ -1,4 +1,274 @@
-// import { Lobby } from '../models/Lobby.js';
+import { Lobby } from '../models/Lobby.js';
+import { Player } from '../models/Player.js';
+import { generateGameCode } from '../utils/generateCode.js';
+import jwt from 'jsonwebtoken';
 
-// @Game-Of-Liars/ 
-// Okay so ive made the lobby and player models, as well as the 3 main lobby routes to create and join a lobby, as well as controller, I just need to work on services. I need to make sure when a user creates a lobby it doesnt use a code that is already in use and also I want the pregame lobby to end and delete in 5 minutes if nobody starts it. How do I go about this.
+const lobbyStore = new Map();
+const playerToLobby = new Map(); // playerId -> lobbyCode
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = '1h';
+
+// Generate JWT token for a player
+const generateToken = (player, lobbyCode) => {
+    return jwt.sign(
+        {
+            sub: player.id,
+            name: player.getName(),
+            lobby: lobbyCode,
+            isHost: player.getIsHost(),
+            iat: Math.floor(Date.now() / 1000),
+        },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRES_IN}
+    );
+};
+
+// Verify JWT Token
+export const verifyToken = (token) => {
+    try {
+        return jwt.verify(token, JWT_SECRET)
+    } catch (error) {
+        console.log(error);
+        return null;
+    }
+}
+
+// Create a new lobby
+export const createNewLobby = (playerName) => {
+    let code;
+    do {
+        code = generateGameCode();
+    } while (lobbyStore.has(code));
+
+    const host = new Player(playerName.trim(), true);
+    host.setTeam("blue");
+    host.id = generatePlayerId();
+
+    const lobby = new Lobby(code, host);
+    lobbyStore.set(code, lobby);
+    playerToLobby.set(host.id, code);
+
+    const token = generateToken(host, code);
+
+    return {
+        success: true,
+        token,
+        lobby: getLobbySnapshot(lobby),
+        player: {
+            id: host.id,
+            name: host.getName(),
+            isHost: true
+        }
+    };
+}
+
+// Join an existing lobby
+export const joinLobby = (playerName, code) => {
+    const lobbyCode = code.trim().toUpperCase();
+    const lobby = lobbyStore.get(lobbyCode);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+    if (lobby.getTotalPlayers() >= lobby.getMaxPlayers()) {
+        return { success: false, message: 'Lobby is full' };
+    }
+    if (lobby.getGamePhase() !== 'pregame') {
+        return { success: false, message: 'Game has already started' };
+    }
+
+    // Create player
+    const player = new Player(playerName.trim(), false);
+    player.id = generatePlayerId();
+
+    addPlayerToSmallerTeam(player, lobby);
+    playerToLobby.set(player.id, lobbyCode);
+
+    const token = generateToken(player, lobbyCode);
+
+    return {
+        success: true,
+        token,
+        lobby: getLobbySnapshot(lobby),
+        player: {
+            id: player.id,
+            name: player.getName(),
+            isHost: false
+        }
+    };  
+};
+
+
+// Set player team
+export const setPlayerTeam = (playerid, code, team, isCap=false) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+
+    const player = lobby.getAllPlayers().find(p => p.id === playerid);
+    if (!player) {
+        return { success: false, message: 'Player not found' };
+    }
+
+    try {
+        if (team === 'blue' && lobby.getBlueTeamSize() >= lobby.getMaxTeamSize()) {
+            return { success: false, message: 'Blue team is full' };
+        }
+        if (team === 'red' && lobby.getRedTeamSize() >= lobby.getMaxTeamSize()) {
+            return { success: false, message: 'Red team is full' };
+        }
+
+        lobby.setPlayer(player, team, isCap);
+        
+        return { success: true, lobby: getLobbySnapshot(lobby) };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+}
+
+// Update lobby settings (host only)
+export const updateSettings = (playerId, code, settings) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+
+    // Check if player is host
+    if (lobby.getHost().id !== playerId) {
+        return { success: false, message: 'Only host can update settings' };
+    }
+
+    // Validate settings
+    if (settings.rounds && (settings.rounds < 1 || settings.rounds > 20)) {
+        return { success: false, message: 'Rounds must be between 1 and 20' };
+    }
+    
+    if (settings.roundLimit && (settings.roundLimit < 15 || settings.roundLimit > 120)) {
+        return { success: false, message: 'Round limit must be between 15 and 120 seconds' };
+    }
+
+    // Update settings
+    Object.assign(lobby.settings, settings);
+    
+    return { success: true, lobby: getLobbySnapshot(lobby) };
+};
+
+// Kick player (host only)
+export const kickPlayer = (actorId, code, targetId) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+
+    if (lobby.getHost().id !== actorId) {
+        return { success: false, message: 'Only host can kick players' };
+    }
+
+    const targetPlayer = lobby.getAllPlayers().find(p => p.id === targetId);
+    if (!targetPlayer) {
+        return { success: false, message: 'Target Player not found' };
+    }
+    if (targetPlayer.getIsHost()) {
+        return { success: false, message: 'Host cannot be kicked' };
+    }
+
+    lobby.removePlayer(targetPlayer);
+    playerToLobby.delete(targetPlayer.id);
+
+    return { success: true, lobby: getLobbySnapshot(lobby) };
+}
+
+// Leave lobby
+export const leaveLobby = (playerId, code) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+
+    // Find player
+    const player = lobby.getAllPlayers().find(p => p.id === playerId);
+    
+    if (!player) {
+        return { success: false, message: 'Player not found' };
+    }
+
+    // Remove player
+    lobby.removePlayer(player);
+    playerToLobby.delete(playerId);
+
+    // TODO: If host leaves, end lobby
+    if (player.getIsHost()) {
+        lobbyStore.delete(code);
+        return { success: true, lobbyEnded: true };
+    }
+
+    return { success: true, lobby: getLobbySnapshot(lobby) };
+};
+
+// Add player to team with less players
+const addPlayerToSmallerTeam = (player, lobby) => {
+    if (lobby.getBlueTeamSize() <= lobby.getRedTeamSize()) {
+        lobby.setPlayer(player, "blue");
+    } else {
+        lobby.setPlayer(player, "red");
+    }
+}
+
+// Get Lobby snapshot
+export const getLobbySnapshot = (lobby) => {
+    const playerToDTO = (player) => ({
+        id: player.id,
+        name: player.getName(),
+        team: player.getTeam(),
+        role: player.getRole(),
+        isConnected: player.getIsConnected(),
+        isHost: player.getIsHost()
+    });
+
+    return {
+        code: lobby.getCode(),
+        settings: lobby.getSettings(),
+        host: {
+            id: lobby.getHost().id,
+            name: lobby.getHost().getName()
+        },
+        blueTeam: lobby.getBlueTeam().map(playerToDTO),
+        redTeam: lobby.getRedTeam().map(playerToDTO),
+        captains: {
+            blue: lobby.getBlueCaptain()?.id || null,
+            red: lobby.getRedCaptain()?.id || null
+        },
+        counts: {
+            blue: lobby.getBlueTeam().length,
+            red: lobby.getRedTeam().length,
+            spectators: lobby.spectators.length
+        },
+        maxTeamSize: lobby.getMaxTeamSize(),
+        maxPlayers: lobby.getMaxPlayers(),
+        gamePhase: lobby.getGamePhase()
+    };
+}
+
+// Get lobby by code
+export const getLobbyByCode = (code) => {
+    return lobbyStore.get(code) || null;
+};
+
+// Get player by ID
+export const getPlayerById = (playerId) => {
+    const lobbyCode = playerToLobby.get(playerId);
+    if (!lobbyCode) return null;
+
+    const lobby = lobbyStore.get(lobbyCode);
+    if (!lobby) return null;
+
+    const allPlayers = [...lobby.getBlueTeam(), ...lobby.getRedTeam()];
+    return allPlayers.find(p => p.id === playerId) || null;
+}
+
+// Generate unique player ID
+const generatePlayerId = () => {
+    return `player_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+};
+

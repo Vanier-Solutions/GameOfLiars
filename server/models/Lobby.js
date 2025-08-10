@@ -10,15 +10,14 @@ export class Lobby {
             roundLimit: 60,
             tags: ['General']
         };
-        this.maxPlayers = 20;
-        this.maxTeamSize = 6;
+        this.maxPlayers = 16;
+        this.maxTeamSize = 8;
         
         this.blueCaptain = null;
         this.redCaptain = null;
         
-        this.blueTeam = [];
-        this.redTeam = [];
-        this.spectators = [host]; 
+        this.blueTeam = [host];
+        this.redTeam = []; 
 
         this.gamePhase = "pregame" // "pregame", "playing", "ended"
         this.rounds = []
@@ -33,45 +32,37 @@ export class Lobby {
         }
     }
 
-    addPlayer(player) {
-        if (this.getTotalPlayers() >= this.maxPlayers) {
-            throw new Error("Lobby is full");
-        }
-        this.spectators.push(player);
-    }
+    setPlayer(player, team, isCaptain=false) {
+        if (team === "blue") {
+            if (this.blueTeam.includes(player)) {
+                throw new Error("Player is already on blue team");
+            }
+            if (isCaptain && this.getBlueCaptain) {
+                throw new Error("Blue Captain already exists");
+            }
 
-    setTeam(player, team, role=null) {
-        this.removeTeamAndRole(player);
-
-        player.setTeam(team, role);
-        switch (team) {
-            case "blue":
-                if (this.blueTeam.includes(player)) {
-                    throw new Error("Player is already on the blue team");
-                }
-
-                this.blueTeam.push(player);
-                if (role === "captain") {
-                    if (this.getBlueCaptain) {
-                        throw new Error("Blue captain already exists");
-                    }
-                    this.blueCaptain = player;
-                }
-                break;
-            case "red":
-                this.redTeam.push(player);
-                if (role === "captain") {
-                    if (this.getRedCaptain()) {
-                        throw new Error("Red captain already exists");
-                    }
-                    this.redCaptain = player;
-                }
-                break;
-            case "spectators":
-                this.spectators.push(player);
-                break;
-            default:
-                throw new Error("Invalid team");
+            this.removeTeamAndRole(player);
+            player.setTeam(team, isCaptain);
+            this.blueTeam.push(player);
+            if (isCaptain) {
+                this.setCaptain(player, "blue");
+            }
+        } else if (team === "red") {
+            if (this.redTeam.includes(player)) {
+                throw new Error("Player is already on red team");
+            }
+            if (isCaptain && this.getRedCaptain) {
+                throw new Error("Red Captain already exists");
+            }
+            
+            this.removeTeamAndRole(player);
+            player.setTeam(team, isCaptain);
+            this.redTeam.push(player);
+            if (isCaptain) {
+                this.setCaptain(player, "red");
+            }
+        } else {
+            throw new Error("Invalid team");
         }
     }
 
@@ -80,8 +71,6 @@ export class Lobby {
             this.blueTeam = this.blueTeam.filter(p => p !== player);
         } else if (player.getTeam() === "red") {
             this.redTeam = this.redTeam.filter(p => p !== player);
-        } else if (player.getTeam() === "spectators") {
-            this.spectators = this.spectators.filter(p => p !== player);
         }
         if (player === this.blueCaptain) {
             this.blueCaptain = null;
@@ -105,6 +94,16 @@ export class Lobby {
 
     decrementRound() {
         this.gameState.currentRoundNumber--;
+    }
+
+    setCaptain(player, team) {
+        if (team == "blue") {
+            this.blueCaptain = player;
+        } else if (team == "red") {
+            this.redCaptain = player;
+        } else {
+            throw new Error("Invalid team");
+        }
     }
         
 
@@ -133,8 +132,14 @@ export class Lobby {
     getRedTeam() {
         return this.redTeam;
     }
-    getSpectators() {   
-        return this.spectators;
+    getAllPlayers() {
+        return [...this.blueTeam, ...this.redTeam];
+    }
+    getBlueTeamSize() {
+        return this.blueTeam.length;
+    }
+    getRedTeamSize() {
+        return this.redTeam.length;
     }
     getGamePhase() {
         return this.gamePhase;
@@ -149,7 +154,7 @@ export class Lobby {
         return this.gameState;
     }
     getTotalPlayers() {
-        return this.blueTeam.length + this.redTeam.length + this.spectators.length;
+        return this.blueTeam.length + this.redTeam.length;
     }
     getMaxTeamSize() {
         return this.maxTeamSize;

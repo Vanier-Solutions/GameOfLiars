@@ -2,27 +2,19 @@ export class Player {
     constructor(name, isHost = false) {
         this.name = name;
         this.isHost = isHost;
-        this.team = "spectator"; // "spectator", "blue", "red"
-        this.role = null;        // "captain", "member"
+        this.isCaptain = false;
+        this.team = null; // "blue", "red"
         this.isConnected = true;
         this.joinedAt = new Date();
     }
 
-    setTeam(team, role=null) {
+    setTeam(team, isCaptain=false) {
         this.team = team;
-        this.role = null;
+        this.isCaptain = isCaptain;
     }
 
     isCaptain() {
-        return this.role === "captain";
-    }
-
-    isMember() {
-        return this.role === "member"
-    }
-
-    isSpectator() {
-        return this.team === "spectator";
+        return this.isCaptain;
     }
 
     setConnectionStatus(connected) {
@@ -38,8 +30,8 @@ export class Player {
         return this.team;
     }
     
-    getRole() {
-        return this.role;
+    getIsCaptain() {
+        return this.isCaptain;
     }
 
     getIsConnected() {

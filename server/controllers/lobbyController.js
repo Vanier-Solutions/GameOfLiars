@@ -1,5 +1,7 @@
 import * as lobbyService from '../services/lobbyService.js';
 
+const MAX_NAME_LEN = 16;
+
 // Create a new lobby
 export const createLobby = async (req, res) => {
     try {
@@ -12,10 +14,10 @@ export const createLobby = async (req, res) => {
             });
         }
 
-        if (playerName.trim().length > 10) {
+        if (playerName.trim().length > MAX_NAME_LEN) {
             return res.status(400).json({
                 success: false,
-                message: 'Player name must be less than 10 characters'
+                message: 'Player name must be less than 16 characters'
             });
         }
 
@@ -23,8 +25,7 @@ export const createLobby = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            data: lobbyService,
-            message: 'Lobby created successfully'
+            data: result
         });
     } catch (error) {
         res.status(500).json({
@@ -36,16 +37,23 @@ export const createLobby = async (req, res) => {
 
 export const joinLobby = async (req, res) => {
     try {
-        const { playerName, gameCode } = req.body;
+        const { playerName, code } = req.body;
 
-        if (!playerName || !playerName.trim() || !gameCode) {
+        if (!playerName || !playerName.trim() || !code) {
             return res.status(400).json({
                 success: false,
                 message: 'Player name and lobby code are required'
             });
         }
 
-        const result = await lobbyService.joinLobby(playerName, gameCode); // TODO: Handle lobby in progress
+        if (playerName.trim().length > MAX_NAME_LEN) {
+            return res.status(400).json({
+                success: false,
+                message: 'Player name must be less than 16 characters'
+            });
+        }
+
+        const result = await lobbyService.joinLobby(playerName, code);
 
         if(!lobby.success) {
             return res.status(404).json(result);
@@ -60,8 +68,7 @@ export const joinLobby = async (req, res) => {
         });
     }
 }
-
-// TODO: Require AUTH
+ 
 export const getLobby = async (req, res) => {
     try {
         const { lobbyCode } = req.params;
@@ -69,13 +76,13 @@ export const getLobby = async (req, res) => {
 		if (!lobby) {
 			return res.status(404).json({
 				success: false,
-				message: 'Game not found'
+				message: 'Lobby not found'
 			});
 		}
 
 		res.json({
 			success: true,
-			data: game
+			data: lobbyService.getLobbySnapshot(lobby)
 		})
 	} catch (error)  {
 		console.error('Error getting lobby:', error);
