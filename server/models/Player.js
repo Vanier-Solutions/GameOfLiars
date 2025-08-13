@@ -13,9 +13,7 @@ export class Player {
         this.isCaptain = isCaptain;
     }
 
-    isCaptain() {
-        return this.isCaptain;
-    }
+    // Remove method name collision with property; prefer getter below
 
     setConnectionStatus(connected) {
         this.isConnected = connected;

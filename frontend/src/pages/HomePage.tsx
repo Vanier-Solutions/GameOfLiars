@@ -1,11 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
+import { toast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
 import { Users, Trophy, Swords, Play as PlayIcon, DoorOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 function BanditLogo({ className }: { className?: string }) {
   return (
@@ -28,21 +31,140 @@ function BanditLogo({ className }: { className?: string }) {
 }
 
 export default function HomePage() {
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [leftName, setLeftName] = useState("")
   const [joinCode, setJoinCode] = useState("")
   const [joinName, setJoinName] = useState("")
+  
+  // Deep link join dialog
+  const [deepLinkOpen, setDeepLinkOpen] = useState(false)
+  const [deepLinkCode, setDeepLinkCode] = useState("")
+  const [deepLinkName, setDeepLinkName] = useState("")
+  
   const canPlay = useMemo(() => leftName.trim().length > 0, [leftName])
   const canJoin = useMemo(() => joinCode.trim().length > 0 && joinName.trim().length > 0, [joinCode, joinName])
+  const canDeepLinkJoin = useMemo(() => deepLinkName.trim().length > 0, [deepLinkName])
 
-  const onPlay = () => {
-    console.log("Play Teams", { name: leftName })
-    alert(`Starting Teams room for ${leftName}`)
+  const onPlay = async () => {
+    try {
+      const res = await fetch("http://localhost:5051/api/lobby/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerName: leftName })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to create lobby")
+      }
+      localStorage.setItem("gameToken", data.token)
+      localStorage.setItem("lobbyCode", data.lobby.code)
+      navigate(`/lobby/${data.lobby.code}`)
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message || "Error creating lobby" })
+    }
   }
 
-  const onJoin = () => {
-    console.log("Join Lobby", { code: joinCode, name: joinName })
-    alert(`Joining lobby ${joinCode} as ${joinName}`)
+  const onJoin = async () => {
+    try {
+      const res = await fetch("http://localhost:5051/api/lobby/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerName: joinName, code: joinCode })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to join lobby")
+      }
+      localStorage.setItem("gameToken", data.token)
+      localStorage.setItem("lobbyCode", data.lobby.code)
+      navigate(`/lobby/${data.lobby.code}`)
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message || "Error joining lobby" })
+    }
   }
+
+  const onDeepLinkJoin = async () => {
+    try {
+      const res = await fetch("http://localhost:5051/api/lobby/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerName: deepLinkName, code: deepLinkCode })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to join lobby")
+      }
+      localStorage.setItem("gameToken", data.token)
+      localStorage.setItem("lobbyCode", data.lobby.code)
+      setDeepLinkOpen(false)
+      navigate(`/lobby/${data.lobby.code}`)
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message || "Error joining lobby" })
+    }
+  }
+
+  // Check for deep link join on mount
+  useEffect(() => {
+    const lobbyCode = searchParams.get('join')
+    if (lobbyCode) {
+      const checkLobbyExists = async () => {
+        try {
+          // Quick check if lobby exists without authentication
+          const res = await fetch(`http://localhost:5051/api/lobby/${lobbyCode.toUpperCase()}`)
+          const data = await res.json()
+          
+          // If lobby exists (even if we get 401 due to no token), show dialog
+          if (res.status === 401 || res.status === 403) {
+            setDeepLinkCode(lobbyCode.toUpperCase())
+            setDeepLinkOpen(true)
+          } else if (res.ok && data.success) {
+            // Lobby exists and we somehow have access - show dialog anyway
+            setDeepLinkCode(lobbyCode.toUpperCase())
+            setDeepLinkOpen(true)
+          } else {
+            // Lobby doesn't exist - show error
+            toast({ 
+              variant: "destructive", 
+              title: "Lobby not found", 
+              description: `Lobby ${lobbyCode.toUpperCase()} does not exist or has ended.` 
+            })
+          }
+        } catch (err) {
+          // Network error - show generic error
+          toast({ 
+            variant: "destructive", 
+            title: "Connection error", 
+            description: "Could not connect to server. Please try again." 
+          })
+        }
+      }
+      
+      checkLobbyExists()
+      // Clear the search param
+      setSearchParams({})
+    }
+  }, [searchParams, setSearchParams])
+
+  // If navigating to a different lobby link, proactively leave current lobby if token exists
+  useEffect(() => {
+    const handleBeforeNavigate = (e: MouseEvent) => {
+      // If user clicks on a link to /lobby/:code, leave previous lobby
+      const target = e.target as HTMLElement
+      const anchor = target.closest('a') as HTMLAnchorElement | null
+      if (anchor && /\/lobby\//.test(anchor.pathname) && localStorage.getItem('gameToken')) {
+        // fire and forget leave
+        fetch('http://localhost:5051/api/lobby/leave', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${localStorage.getItem('gameToken')}` }
+        }).finally(() => {
+          localStorage.removeItem('gameToken')
+        })
+      }
+    }
+    window.addEventListener('click', handleBeforeNavigate)
+    return () => window.removeEventListener('click', handleBeforeNavigate)
+  }, [])
 
   const GamemodeCard = ({
     icon: Icon,
@@ -89,6 +211,32 @@ export default function HomePage() {
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900">
       <div className="pointer-events-none absolute inset-0 bg-[conic-gradient(from_210deg_at_50%_50%,rgba(255,255,255,0.04),transparent_30%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(59,130,246,0.10),transparent),radial-gradient(1000px_500px_at_90%_10%,rgba(16,185,129,0.10),transparent)]" />
+      
+      <Dialog open={deepLinkOpen} onOpenChange={setDeepLinkOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Join Lobby</DialogTitle>
+            <DialogDescription>Enter your name to join lobby {deepLinkCode}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              autoFocus
+              placeholder="Your name"
+              value={deepLinkName}
+              onChange={(e) => setDeepLinkName(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeepLinkOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={onDeepLinkJoin} disabled={!canDeepLinkJoin}>
+              Join
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="mx-auto max-w-7xl px-4 pb-12 pt-6 relative">
         <div className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -130,7 +278,7 @@ export default function HomePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Enter code" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400" />
+                <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="Enter code" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400" />
                 <Input value={joinName} onChange={(e) => setJoinName(e.target.value)} placeholder="Your name" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400" />
               </div>
               <motion.div whileHover={{ scale: canJoin ? 1.02 : 1 }} whileTap={{ scale: canJoin ? 0.98 : 1 }}>

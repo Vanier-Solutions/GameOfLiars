@@ -221,7 +221,6 @@ export const getLobbySnapshot = (lobby) => {
         id: player.id,
         name: player.getName(),
         team: player.getTeam(),
-        role: player.getRole(),
         isConnected: player.getIsConnected(),
         isHost: player.getIsHost()
     });
@@ -241,8 +240,7 @@ export const getLobbySnapshot = (lobby) => {
         },
         counts: {
             blue: lobby.getBlueTeam().length,
-            red: lobby.getRedTeam().length,
-            spectators: lobby.spectators.length
+            red: lobby.getRedTeam().length
         },
         maxTeamSize: lobby.getMaxTeamSize(),
         maxPlayers: lobby.getMaxPlayers(),

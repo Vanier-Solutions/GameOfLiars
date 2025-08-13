@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +11,9 @@ import { Crown, Trash2, Plus, X } from "lucide-react"
 interface Player {
   id: string
   name: string
-  isCaptain: boolean
+  isCaptain?: boolean
+  isHost?: boolean
+  team?: "blue" | "red" | null
 }
 
 interface GameSettings {
@@ -20,31 +23,65 @@ interface GameSettings {
 }
 
 export default function LobbyPage() {
-  const [blueTeam, setBlueTeam] = useState<Player[]>([
-    { id: "1", name: "Alice", isCaptain: true },
-    { id: "2", name: "Bob", isCaptain: false },
-  ])
-
-  const [redTeam, setRedTeam] = useState<Player[]>([{ id: "3", name: "Charlie", isCaptain: true }])
-
-  const [spectators, setSpectators] = useState<Player[]>([
-    { id: "4", name: "David", isCaptain: false },
-    { id: "5", name: "Eve", isCaptain: false },
-    { id: "6", name: "Frank", isCaptain: false },
-    { id: "7", name: "Grace", isCaptain: false },
-    { id: "8", name: "Henry", isCaptain: false },
-    { id: "9", name: "Ivy", isCaptain: false },
-  ])
-
-  const [gameSettings, setGameSettings] = useState<GameSettings>({
-    rounds: 5,
-    roundLimit: 60,
-    tags: ["General", "Movies"],
-  })
-
+  const { code } = useParams()
+  const [blueTeam, setBlueTeam] = useState<Player[]>([])
+  const [redTeam, setRedTeam] = useState<Player[]>([])
+  const [gameSettings, setGameSettings] = useState<GameSettings>({ rounds: 7, roundLimit: 60, tags: ["General"] })
+  const [hostName, setHostName] = useState<string>("")
   const [newTag, setNewTag] = useState("")
-  const gameCode = "ABCD"
-  const hostName = "Alice"
+  const gameCode = code || "" 
+  const [currentLobbyFromToken, setCurrentLobbyFromToken] = useState<string | null>(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchLobby = async () => {
+      try {
+        const token = localStorage.getItem("gameToken")
+        // If no token yet, redirect to home with join query parameter
+        if (!token) {
+          navigate(`/?join=${gameCode}`)
+          return
+        }
+        const res = await fetch(`http://localhost:5051/api/lobby/${gameCode}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const data = await res.json()
+        if (!res.ok || !data.success) {
+          // If 401/403 or lobby not found, redirect to home
+          localStorage.removeItem("gameToken")
+          navigate("/")
+          return
+        }
+        const lobby = data.data
+        setBlueTeam(lobby.blueTeam)
+        setRedTeam(lobby.redTeam)
+        setGameSettings(lobby.settings)
+        setHostName(lobby.host.name)
+        setCurrentLobbyFromToken(lobby.code)
+      } catch (err: any) {
+        // Network or other errors - redirect home
+        localStorage.removeItem("gameToken")
+        navigate("/")
+      }
+    }
+    if (gameCode) fetchLobby()
+  }, [gameCode, navigate])
+
+  // If user navigates to a different lobby while having a token for another lobby, leave previous
+  useEffect(() => {
+    const token = localStorage.getItem('gameToken')
+    if (!token) return
+    if (currentLobbyFromToken && currentLobbyFromToken !== gameCode) {
+      fetch('http://localhost:5051/api/lobby/leave', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      }).finally(() => {
+        localStorage.removeItem('gameToken')
+        navigate("/") 
+      })
+    }
+  }, [gameCode, currentLobbyFromToken])
+
 
   const addTag = () => {
     if (newTag.trim() && !gameSettings.tags.includes(newTag.trim())) {
@@ -186,34 +223,6 @@ export default function LobbyPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Spectators */}
-              <div>
-                <h3 className="text-lg font-semibold text-white mb-3">Spectators ({spectators.length})</h3>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  {spectators.map((player) => (
-                    <div
-                      key={player.id}
-                      className="flex items-center justify-between p-2 bg-slate-700/30 rounded border border-slate-600/50 text-sm"
-                    >
-                      <span className="text-white truncate">{player.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1 ml-1"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full border-slate-600 text-slate-300 hover:bg-slate-700/50 bg-transparent text-sm py-2"
-                >
-                  Join as Spectator
-                </Button>
               </div>
             </CardContent>
           </Card>

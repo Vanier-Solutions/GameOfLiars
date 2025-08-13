@@ -1,5 +1,11 @@
 import * as lobbyService from '../services/lobbyService.js';
 
+const getBearerToken = (req) => {
+    const auth = req.headers.authorization || '';
+    const [, token] = auth.split(' ');
+    return token || null;
+};
+
 const MAX_NAME_LEN = 16;
 
 // Create a new lobby
@@ -21,12 +27,9 @@ export const createLobby = async (req, res) => {
             });
         }
 
-        const lobby = await lobbyService.createNewLobby(playerName);
+        const result = await lobbyService.createNewLobby(playerName);
 
-        res.status(201).json({
-            success: true,
-            data: result
-        });
+        res.status(201).json(result);
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -55,8 +58,10 @@ export const joinLobby = async (req, res) => {
 
         const result = await lobbyService.joinLobby(playerName, code);
 
-        if(!lobby.success) {
-            return res.status(404).json(result);
+        if(!result.success) {
+            // Lobby not found → 404; otherwise 400 for other errors
+            const status = result.message === 'Lobby not found' ? 404 : 400;
+            return res.status(status).json(result);
         }
 
         res.json(result);
@@ -72,18 +77,25 @@ export const joinLobby = async (req, res) => {
 export const getLobby = async (req, res) => {
     try {
         const { lobbyCode } = req.params;
-		const lobby = await lobbyService.getLobbyByCode(lobbyCode);
-		if (!lobby) {
-			return res.status(404).json({
-				success: false,
-				message: 'Lobby not found'
-			});
-		}
+        // Require valid token and ensure it matches this lobby
+        const token = getBearerToken(req);
+        if (!token) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const payload = lobbyService.verifyToken(token);
+        if (!payload) {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+        if (payload.lobby !== lobbyCode) {
+            return res.status(403).json({ success: false, message: 'Forbidden' });
+        }
 
-		res.json({
-			success: true,
-			data: lobbyService.getLobbySnapshot(lobby)
-		})
+        const lobby = await lobbyService.getLobbyByCode(lobbyCode);
+        if (!lobby) {
+            return res.status(404).json({ success: false, message: 'Lobby not found' });
+        }
+
+        res.json({ success: true, data: lobbyService.getLobbySnapshot(lobby) })
 	} catch (error)  {
 		console.error('Error getting lobby:', error);
 		res.status(500).json({
@@ -91,4 +103,27 @@ export const getLobby = async (req, res) => {
 			message: 'Internal server error'
 		});
 	}
+};
+
+// Leave lobby (uses Authorization bearer token)
+export const leaveLobby = async (req, res) => {
+    try {
+        const token = getBearerToken(req);
+        if (!token) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const payload = lobbyService.verifyToken(token);
+        if (!payload) {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+
+        const result = await lobbyService.leaveLobby(payload.sub, payload.lobby);
+        if (!result.success) {
+            return res.status(400).json(result);
+        }
+        res.json(result);
+    } catch (error) {
+        console.error('Error leaving lobby:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
 };
