@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Crown, Trash2, Plus, X } from "lucide-react"
 import { socketService, addSocketListener, removeSocketListener } from "@/lib/socket"
+import { getBaseUrl } from "@/lib/api"
 
 interface Player {
   id: string
@@ -56,7 +57,7 @@ export default function LobbyPage() {
           navigate(`/?join=${gameCode}`)
           return
         }
-        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/${gameCode}`, {
+        const res = await fetch(`${getBaseUrl()}/api/lobby/${gameCode}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         const data = await res.json()
@@ -91,7 +92,7 @@ export default function LobbyPage() {
     const token = localStorage.getItem('gameToken')
     if (!token) return
     if (currentLobbyFromToken && currentLobbyFromToken !== gameCode) {
-      fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/leave`, {
+      fetch(`${getBaseUrl()}/api/lobby/leave`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       }).finally(() => {
@@ -246,7 +247,7 @@ export default function LobbyPage() {
     try {
       const token = localStorage.getItem('gameToken')
       if (!token) return
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/start`, {
+      const res = await fetch(`${getBaseUrl()}/api/lobby/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -263,7 +264,7 @@ export default function LobbyPage() {
     try {
       const token = localStorage.getItem('gameToken')
       if (!token) return
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/end`, {
+      const res = await fetch(`${getBaseUrl()}/api/lobby/end`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -280,7 +281,7 @@ export default function LobbyPage() {
     try {
       const token = localStorage.getItem('gameToken')
       if (!token) return
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/leave`, {
+      const res = await fetch(`${getBaseUrl()}/api/lobby/leave`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       })

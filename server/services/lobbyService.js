@@ -254,6 +254,29 @@ export const leaveLobby = (playerId, code) => {
     return { success: true, lobby: getLobbySnapshot(lobby) };
 };
 
+
+
+// End lobby (host only)
+export const endLobby = (playerId, code) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+         return { success: false, message: 'Lobby not found' };
+    }
+
+    if (lobby.getHost().id !== playerId) {
+        return { success: false, message: 'Only host can end the lobby' };
+    }
+
+    // Remove player->lobby mappings
+    for (const p of lobby.getAllPlayers()) {
+        playerToLobby.delete(p.id);
+    }
+    lobbyStore.delete(code);
+
+    return { success: true, lobbyEnded: true };
+};
+
+
 // Add player to team with less players
 const addPlayerToSmallerTeam = (player, lobby) => {
     if (lobby.getBlueTeamSize() <= lobby.getRedTeamSize()) {

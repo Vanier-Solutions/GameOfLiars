@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { getBaseUrl } from "@/lib/api"
 
 function BanditLogo({ className }: { className?: string }) {
   return (
@@ -48,7 +49,7 @@ export default function HomePage() {
 
   const onPlay = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/create`, {
+      const res = await fetch(`${getBaseUrl()}/api/lobby/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerName: leftName })
@@ -67,7 +68,7 @@ export default function HomePage() {
 
   const onJoin = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/join`, {
+      const res = await fetch(`${getBaseUrl()}/api/lobby/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerName: joinName, code: joinCode })
@@ -86,7 +87,7 @@ export default function HomePage() {
 
   const onDeepLinkJoin = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/join`, {
+      const res = await fetch(`${getBaseUrl()}/api/lobby/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerName: deepLinkName, code: deepLinkCode })
@@ -111,7 +112,7 @@ export default function HomePage() {
       const checkLobbyExists = async () => {
         try {
           // Quick check if lobby exists without authentication
-                     const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/${lobbyCode.toUpperCase()}`)
+                     const res = await fetch(`${getBaseUrl()}/api/lobby/${lobbyCode.toUpperCase()}`)
           const data = await res.json()
           
           // If lobby exists (even if we get 401 due to no token), show dialog
@@ -154,7 +155,7 @@ export default function HomePage() {
       const anchor = target.closest('a') as HTMLAnchorElement | null
       if (anchor && /\/lobby\//.test(anchor.pathname) && localStorage.getItem('gameToken')) {
         // fire and forget leave
-                 fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/leave`, {
+                 fetch(`${getBaseUrl()}/api/lobby/leave`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${localStorage.getItem('gameToken')}` }
         }).finally(() => {
