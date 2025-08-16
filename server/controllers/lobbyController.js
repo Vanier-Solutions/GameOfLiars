@@ -95,6 +95,15 @@ export const getLobby = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Lobby not found' });
         }
 
+        // Verify that the player from the token actually exists in the lobby
+        const playerExists = lobby.getAllPlayers().find(p => p.id === payload.sub);
+        if (!playerExists) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Player no longer in lobby - token invalid' 
+            });
+        }
+
         res.json({ success: true, data: lobbyService.getLobbySnapshot(lobby) })
 	} catch (error)  {
 		console.error('Error getting lobby:', error);

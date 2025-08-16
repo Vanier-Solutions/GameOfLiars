@@ -1,4 +1,5 @@
 import { verifyToken } from '../services/lobbyService.js';
+import * as lobbyService from '../services/lobbyService.js';
 
 // playerId -> Socket Connection
 const playerSockets = new Map();
@@ -29,6 +30,18 @@ export const setupSocketHandlers = (io) => {
                 }
 
                 const { sub: playerId, lobby: lobbyCode } = payload;
+
+                // Verify that the player actually exists in the lobby
+                const lobby = lobbyService.getLobbyByCode(lobbyCode);
+                if (!lobby) {
+                    socket.emit('error', { message: 'Lobby not found' });
+                    return;
+                }
+                const playerExists = lobby.getAllPlayers().find(p => p.id === playerId);
+                if (!playerExists) {
+                    socket.emit('error', { message: 'Player no longer in lobby - please rejoin' });
+                    return;
+                }
 
                 // Store socket mappings
                 playerSockets.set(playerId, socket.id);
@@ -104,27 +117,8 @@ export const setupSocketHandlers = (io) => {
             const lobbyCode = socket.data.lobbyCode;
 
             if (playerId && lobbyCode) {
-                // Remove socket mappings
-                playerSockets.delete(playerId);
-                
-                if (lobbySockets.has(lobbyCode)) {
-                    lobbySockets.get(lobbyCode).delete(socket.id);
-                    if (lobbySockets.get(lobbyCode).size === 0) {
-                        lobbySockets.delete(lobbyCode);
-                    }
-                }
-
-                console.log(`Player ${playerId} disconnected from lobby ${lobbyCode}`);
-                
-                // Emit player disconnected event to all remaining players in the lobby
-                socket.to(lobbyCode).emit('player-disconnected', {
-                    playerId,
-                    lobbyCode,
-                    timestamp: new Date().toISOString()
-                });
+                lobbyService.leaveLobby(playerId, lobbyCode);
             }
-
-            console.log(`Socket disconnected: ${socket.id}`);
         });
 
         // Handle lobby updates (team changes, settings changes, etc.)
