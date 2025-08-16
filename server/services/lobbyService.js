@@ -267,6 +267,8 @@ export const endLobby = (playerId, code) => {
         return { success: false, message: 'Only host can end the lobby' };
     }
 
+    emitLobbyEnded(code, 'Host ended the lobby');
+
     // Remove player->lobby mappings
     for (const p of lobby.getAllPlayers()) {
         playerToLobby.delete(p.id);
