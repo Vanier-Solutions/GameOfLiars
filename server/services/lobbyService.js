@@ -2,6 +2,13 @@ import { Lobby } from '../models/Lobby.js';
 import { Player } from '../models/Player.js';
 import { generateGameCode } from '../utils/generateCode.js';
 import jwt from 'jsonwebtoken';
+import { 
+    emitPlayerJoined, 
+    emitPlayerLeft, 
+    emitPlayerTeamChanged, 
+    emitPlayerKicked, 
+    emitLobbyEnded 
+} from '../socket/socketService.js';
 
 const lobbyStore = new Map();
 const playerToLobby = new Map(); // playerId -> lobbyCode
@@ -86,6 +93,14 @@ export const joinLobby = (playerName, code) => {
 
     const token = generateToken(player, lobbyCode);
 
+    // Emit socket event for player joining
+    emitPlayerJoined(lobbyCode, {
+        id: player.id,
+        name: player.getName(),
+        team: player.getTeam(),
+        isHost: player.getIsHost()
+    }, getLobbySnapshot(lobby));
+
     return {
         success: true,
         token,
@@ -120,6 +135,14 @@ export const setPlayerTeam = (playerid, code, team, isCap=false) => {
         }
 
         lobby.setPlayer(player, team, isCap);
+        
+        // Emit socket event for team change
+        emitPlayerTeamChanged(code, {
+            id: player.id,
+            name: player.getName(),
+            team: player.getTeam(),
+            isCaptain: player.getIsCaptain()
+        }, getLobbySnapshot(lobby));
         
         return { success: true, lobby: getLobbySnapshot(lobby) };
     } catch (error) {
@@ -173,8 +196,19 @@ export const kickPlayer = (actorId, code, targetId) => {
         return { success: false, message: 'Host cannot be kicked' };
     }
 
-    lobby.removeTeamAndRole(targetPlayer);
+    // Store player info before removal for socket event
+    const playerInfo = {
+        id: targetPlayer.id,
+        name: targetPlayer.getName(),
+        team: targetPlayer.getTeam(),
+        isHost: targetPlayer.getIsHost()
+    };
+
+    lobby.removePlayer(targetPlayer);
     playerToLobby.delete(targetPlayer.id);
+
+    // Emit socket event for player kicked
+    emitPlayerKicked(code, playerInfo, actorId, getLobbySnapshot(lobby));
 
     return { success: true, lobby: getLobbySnapshot(lobby) };
 }
@@ -193,66 +227,33 @@ export const leaveLobby = (playerId, code) => {
         return { success: false, message: 'Player not found' };
     }
 
+    // Store player info before removal for socket event
+    const playerInfo = {
+        id: player.id,
+        name: player.getName(),
+        team: player.getTeam(),
+        isHost: player.getIsHost()
+    };
+
     // Remove player
-    lobby.removeTeamAndRole(player);
+    lobby.removePlayer(player);
     playerToLobby.delete(playerId);
 
     // TODO: If host leaves, end lobby
     if (player.getIsHost()) {
+        // Emit lobby ended event
+        emitLobbyEnded(code, 'Host left the lobby');
+        
         lobbyStore.delete(code);
         return { success: true, lobbyEnded: true };
     }
 
+    // Emit socket event for player leaving
+    emitPlayerLeft(code, playerInfo, getLobbySnapshot(lobby));
+
     return { success: true, lobby: getLobbySnapshot(lobby) };
 };
 
-// Start game (host only)
-export const startGame = (playerId, code) => {
-    const lobby = lobbyStore.get(code);
-    if (!lobby) {
-        return { success: false, message: 'Lobby not found' };
-    }
-
-    if (lobby.getHost().id !== playerId) {
-        return { success: false, message: 'Only host can start the game' };
-    }
-
-    if (lobby.getGamePhase() !== 'pregame') {
-        return { success: false, message: 'Game has already started' };
-    }
-
-    if (!lobby.getBlueCaptain() || !lobby.getRedCaptain()) {
-        return { success: false, message: 'Both teams must have a captain to start the game' };
-    }
-
-    // TODO: Initialize basic game state
-    // lobby.gamePhase = 'playing';
-    // lobby.gameState.currentRoundNumber = 1;
-    // lobby.gameState.currentRound = { startedAt: Date.now() };
-
-    return { success: true, lobby: getLobbySnapshot(lobby), test: true };
-};
-
-// End lobby (host only)
-export const endLobby = (playerId, code) => {
-    const lobby = lobbyStore.get(code);
-    if (!lobby) {
-         return { success: false, message: 'Lobby not found' };
-    }
-
-    if (lobby.getHost().id !== playerId) {
-        return { success: false, message: 'Only host can end the lobby' };
-    }
-
-    // Remove player->lobby mappings
-    const allPlayers = [...lobby.getBlueTeam(), ...lobby.getRedTeam()];
-    for (const p of allPlayers) {
-        playerToLobby.delete(p.id);
-    }
-    lobbyStore.delete(code);
-
-    return { success: true, lobbyEnded: true };
-};
 // Add player to team with less players
 const addPlayerToSmallerTeam = (player, lobby) => {
     if (lobby.getBlueTeamSize() <= lobby.getRedTeamSize()) {

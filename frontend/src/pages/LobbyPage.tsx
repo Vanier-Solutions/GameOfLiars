@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Crown, Trash2, Plus, X } from "lucide-react"
+import { socketService, addSocketListener, removeSocketListener } from "@/lib/socket"
 
 interface Player {
   id: string
@@ -55,7 +56,7 @@ export default function LobbyPage() {
           navigate(`/?join=${gameCode}`)
           return
         }
-        const res = await fetch(`http://localhost:5051/api/lobby/${gameCode}`, {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/${gameCode}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         const data = await res.json()
@@ -72,6 +73,10 @@ export default function LobbyPage() {
         setHostName(lobby.host.name)
         setCurrentLobbyFromToken(lobby.code)
         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
+
+        // Connect to socket and join lobby
+        socketService.connect()
+        socketService.joinLobby(token)
       } catch (err: any) {
         // Network or other errors - redirect home
         localStorage.removeItem("gameToken")
@@ -86,7 +91,7 @@ export default function LobbyPage() {
     const token = localStorage.getItem('gameToken')
     if (!token) return
     if (currentLobbyFromToken && currentLobbyFromToken !== gameCode) {
-      fetch('http://localhost:5051/api/lobby/leave', {
+      fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/leave`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       }).finally(() => {
@@ -95,6 +100,112 @@ export default function LobbyPage() {
       })
     }
   }, [gameCode, currentLobbyFromToken])
+
+  // Set up socket event listeners
+  useEffect(() => {
+    const setupSocketListeners = () => {
+      // Handle player joined
+      addSocketListener('player-joined', (data) => {
+        const { player, lobby } = data
+        setBlueTeam(lobby.blueTeam)
+        setRedTeam(lobby.redTeam)
+        setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
+        toast({
+          title: 'Player Joined',
+          description: `${player.name} joined the lobby`,
+        })
+      })
+
+      // Handle player left
+      addSocketListener('player-left', (data) => {
+        const { player, lobby } = data
+        setBlueTeam(lobby.blueTeam)
+        setRedTeam(lobby.redTeam)
+        setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
+        toast({
+          title: 'Player Left',
+          description: `${player.name} left the lobby`,
+        })
+      })
+
+      // Handle player disconnected
+      addSocketListener('player-disconnected', () => {
+        toast({
+          variant: 'destructive',
+          title: 'Player Disconnected',
+          description: `A player disconnected from the lobby`,
+        })
+      })
+
+      // Handle lobby updates
+      addSocketListener('lobby-updated', (data) => {
+        const { lobby, updateType } = data
+        setBlueTeam(lobby.blueTeam)
+        setRedTeam(lobby.redTeam)
+        setGameSettings(lobby.settings)
+        setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
+        
+        if (updateType === 'team-change') {
+          toast({
+            title: 'Teams Updated',
+            description: 'A player changed teams',
+          })
+        } else if (updateType === 'settings') {
+          toast({
+            title: 'Settings Updated',
+            description: 'Game settings have been changed',
+          })
+        }
+      })
+
+      // Handle lobby ended
+      addSocketListener('lobby-ended', (data) => {
+        toast({
+          variant: 'destructive',
+          title: 'Lobby Ended',
+          description: data.reason || 'The lobby has been ended',
+        })
+        localStorage.removeItem('gameToken')
+        navigate('/')
+      })
+
+      // Handle player kicked
+      addSocketListener('player-kicked', (data) => {
+        const { player, lobby } = data
+        setBlueTeam(lobby.blueTeam)
+        setRedTeam(lobby.redTeam)
+        setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
+        toast({
+          variant: 'destructive',
+          title: 'Player Kicked',
+          description: `${player.name} was kicked from the lobby`,
+        })
+      })
+    }
+
+    setupSocketListeners()
+
+    // Cleanup function to remove all listeners
+    return () => {
+      removeSocketListener('player-joined')
+      removeSocketListener('player-left')
+      removeSocketListener('player-disconnected')
+      removeSocketListener('lobby-updated')
+      removeSocketListener('lobby-ended')
+      removeSocketListener('player-kicked')
+    }
+  }, [navigate])
+
+  // Cleanup socket connection on unmount
+  useEffect(() => {
+    return () => {
+      const token = localStorage.getItem('gameToken')
+      if (token) {
+        socketService.leaveLobby(token)
+      }
+      socketService.disconnect()
+    }
+  }, [])
 
 
   const addTag = () => {
@@ -135,7 +246,7 @@ export default function LobbyPage() {
     try {
       const token = localStorage.getItem('gameToken')
       if (!token) return
-      const res = await fetch('http://localhost:5051/api/lobby/start', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -152,7 +263,7 @@ export default function LobbyPage() {
     try {
       const token = localStorage.getItem('gameToken')
       if (!token) return
-      const res = await fetch('http://localhost:5051/api/lobby/end', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/end`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -169,7 +280,7 @@ export default function LobbyPage() {
     try {
       const token = localStorage.getItem('gameToken')
       if (!token) return
-      const res = await fetch('http://localhost:5051/api/lobby/leave', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lobby/leave`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       })

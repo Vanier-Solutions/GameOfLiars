@@ -80,6 +80,10 @@ export class Lobby {
         player.setTeam(null, null);
     }
 
+    removePlayer(player) {
+        this.removeTeamAndRole(player);
+    }
+
     incrementScore(team) {
         this.gameState.scores[team]++;
     }
