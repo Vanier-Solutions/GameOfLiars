@@ -1,8 +1,8 @@
 import { verifyToken } from '../services/lobbyService.js';
 
-// Store socket connections mapped to player IDs
+// playerId -> Socket Connection
 const playerSockets = new Map();
-// Store socket connections mapped to lobby codes
+// lobbyCode -> Socket Connections
 const lobbySockets = new Map();
 
 export const setupSocketHandlers = (io) => {

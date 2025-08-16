@@ -243,6 +243,54 @@ export default function LobbyPage() {
     </div>
   )
 
+  const CaptainSlot = ({ captain, teamColor, onJoinAsCaptain, onKick }: { 
+    captain?: Player; 
+    teamColor: "blue" | "red"; 
+    onJoinAsCaptain: () => void;
+    onKick: () => void;
+  }) => {
+    if (captain) {
+      return (
+        <div className="p-4 bg-gradient-to-r from-slate-700/50 to-slate-600/50 rounded-lg border-2 border-yellow-400/30 relative">
+          <div className="absolute -top-2 left-3 bg-slate-800 px-2 py-1 rounded text-xs font-semibold text-yellow-400 border border-yellow-400/30">
+            CAPTAIN
+          </div>
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-3">
+              <Crown className="w-5 h-5 text-yellow-400" />
+              <span className="text-white font-bold text-lg">{captain.name}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onKick}
+              className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="p-4 bg-gradient-to-r from-slate-700/30 to-slate-600/30 rounded-lg border-2 border-dashed border-slate-500/50 relative">
+        <div className="absolute -top-2 left-3 bg-slate-800 px-2 py-1 rounded text-xs font-semibold text-slate-400 border border-slate-500/30">
+          CAPTAIN
+        </div>
+        <div className="flex items-center justify-center pt-2">
+          <Button 
+            onClick={onJoinAsCaptain}
+            className={`${teamColor === 'blue' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'} text-white flex items-center gap-2`}
+          >
+            <Crown className="w-4 h-4" />
+            Become Captain
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   const handleStartGame = async () => {
     try {
       const token = localStorage.getItem('gameToken')
@@ -314,19 +362,28 @@ export default function LobbyPage() {
               <CardTitle className="text-blue-400 text-center text-xl">Blue Team ({blueTeam.length}/6)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {blueTeam.map((player) => (
+              {/* Captain Slot */}
+              <CaptainSlot 
+                captain={blueTeam.find(player => player.isCaptain)}
+                teamColor="blue"
+                onJoinAsCaptain={() => {}}
+                onKick={() => {}}
+              />
+
+              {/* Regular Team Members */}
+              {blueTeam.filter(player => !player.isCaptain).map((player) => (
                 <PlayerCard key={player.id} player={player} onKick={() => {}} />
               ))}
 
-              <div className="flex gap-2 pt-2">
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">Join as Captain</Button>
+              {/* Join as Member Button */}
+              {blueTeam.length < 6 && (
                 <Button
                   variant="outline"
-                  className="flex-1 border-blue-500 text-blue-400 hover:bg-blue-500/10 bg-transparent"
+                  className="w-full border-blue-500 text-blue-400 hover:bg-blue-500/10 bg-transparent"
                 >
                   Join as Member
                 </Button>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -414,19 +471,28 @@ export default function LobbyPage() {
               <CardTitle className="text-red-400 text-center text-xl">Red Team ({redTeam.length}/6)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {redTeam.map((player) => (
+              {/* Captain Slot */}
+              <CaptainSlot 
+                captain={redTeam.find(player => player.isCaptain)}
+                teamColor="red"
+                onJoinAsCaptain={() => {}}
+                onKick={() => {}}
+              />
+
+              {/* Regular Team Members */}
+              {redTeam.filter(player => !player.isCaptain).map((player) => (
                 <PlayerCard key={player.id} player={player} onKick={() => {}} />
               ))}
 
-              <div className="flex gap-2 pt-2">
-                <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white">Join as Captain</Button>
+              {/* Join as Member Button */}
+              {redTeam.length < 6 && (
                 <Button
                   variant="outline"
-                  className="flex-1 border-red-500 text-red-400 hover:bg-red-500/10 bg-transparent"
+                  className="w-full border-red-500 text-red-400 hover:bg-red-500/10 bg-transparent"
                 >
                   Join as Member
                 </Button>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
