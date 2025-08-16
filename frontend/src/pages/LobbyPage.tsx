@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,9 +32,21 @@ export default function LobbyPage() {
   const [newTag, setNewTag] = useState("")
   const gameCode = code || "" 
   const [currentLobbyFromToken, setCurrentLobbyFromToken] = useState<string | null>(null)
+  const [isHost, setIsHost] = useState<boolean>(false)
+  const [hasCaptains, setHasCaptains] = useState<boolean>(false)
   const navigate = useNavigate()
 
   useEffect(() => {
+    // Decode token to determine host status for UI
+    const token = localStorage.getItem("gameToken")
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        setIsHost(Boolean(payload?.isHost))
+      } catch {}
+    } else {
+      setIsHost(false)
+    }
     const fetchLobby = async () => {
       try {
         const token = localStorage.getItem("gameToken")
@@ -58,6 +71,7 @@ export default function LobbyPage() {
         setGameSettings(lobby.settings)
         setHostName(lobby.host.name)
         setCurrentLobbyFromToken(lobby.code)
+        setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
       } catch (err: any) {
         // Network or other errors - redirect home
         localStorage.removeItem("gameToken")
@@ -117,6 +131,57 @@ export default function LobbyPage() {
     </div>
   )
 
+  const handleStartGame = async () => {
+    try {
+      const token = localStorage.getItem('gameToken')
+      if (!token) return
+      const res = await fetch('http://localhost:5051/api/lobby/start', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to start game')
+      toast({ title: 'Game started' })
+      // Optionally navigate to game screen later
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Start failed', description: e.message })
+    }
+  }
+
+  const handleEndLobby = async () => {
+    try {
+      const token = localStorage.getItem('gameToken')
+      if (!token) return
+      const res = await fetch('http://localhost:5051/api/lobby/end', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to end lobby')
+      localStorage.removeItem('gameToken')
+      navigate('/')
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'End lobby failed', description: e.message })
+    }
+  }
+
+  const handleLeaveLobby = async () => {
+    try {
+      const token = localStorage.getItem('gameToken')
+      if (!token) return
+      const res = await fetch('http://localhost:5051/api/lobby/leave', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to leave lobby')
+      localStorage.removeItem('gameToken')
+      navigate('/')
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Leave failed', description: e.message })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/10 via-slate-900 to-red-900/10"></div>
@@ -170,6 +235,7 @@ export default function LobbyPage() {
                       onChange={(e) =>
                         setGameSettings((prev) => ({ ...prev, rounds: Number.parseInt(e.target.value) || 1 }))
                       }
+                      disabled={!isHost}
                       className="bg-slate-700/50 border-slate-600 text-white"
                     />
                   </div>
@@ -184,6 +250,7 @@ export default function LobbyPage() {
                       onChange={(e) =>
                         setGameSettings((prev) => ({ ...prev, roundLimit: Number.parseInt(e.target.value) || 15 }))
                       }
+                      disabled={!isHost}
                       className="bg-slate-700/50 border-slate-600 text-white"
                     />
                   </div>
@@ -195,10 +262,11 @@ export default function LobbyPage() {
                         placeholder="Add category"
                         value={newTag}
                         onChange={(e) => setNewTag(e.target.value)}
-                        onKeyPress={(e) => e.key === "Enter" && addTag()}
+                        onKeyPress={(e) => e.key === "Enter" && isHost && addTag()}
                         className="bg-slate-700/50 border-slate-600 text-white flex-1"
+                        disabled={!isHost}
                       />
-                      <Button onClick={addTag} size="sm" className="bg-purple-600 hover:bg-purple-700">
+                      <Button onClick={addTag} size="sm" className="bg-purple-600 hover:bg-purple-700" disabled={!isHost || !newTag.trim()}>
                         <Plus className="w-4 h-4" />
                       </Button>
                     </div>
@@ -214,6 +282,7 @@ export default function LobbyPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => removeTag(tag)}
+                            disabled={!isHost}
                             className="ml-1 p-0 h-auto text-purple-300 hover:text-purple-100"
                           >
                             <X className="w-3 h-3" />
@@ -256,12 +325,22 @@ export default function LobbyPage() {
             Host: <span className="font-semibold text-white">{hostName}</span>
           </p>
 
-          <div className="flex justify-center gap-4">
-            <Button variant="destructive" className="bg-red-600 hover:bg-red-700 px-8">
-              End Lobby
-            </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 px-8">Start Game</Button>
-          </div>
+          {isHost ? (
+            <div className="flex justify-center gap-4">
+              <Button variant="destructive" className="bg-red-600 hover:bg-red-700 px-8" onClick={handleEndLobby}>
+                End Lobby
+              </Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 px-8" onClick={handleStartGame} disabled={!hasCaptains}>
+                Start Game
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-center gap-4">
+              <Button variant="outline" className="px-8" onClick={handleLeaveLobby}>
+                Leave Lobby
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

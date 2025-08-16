@@ -173,7 +173,7 @@ export const kickPlayer = (actorId, code, targetId) => {
         return { success: false, message: 'Host cannot be kicked' };
     }
 
-    lobby.removePlayer(targetPlayer);
+    lobby.removeTeamAndRole(targetPlayer);
     playerToLobby.delete(targetPlayer.id);
 
     return { success: true, lobby: getLobbySnapshot(lobby) };
@@ -194,7 +194,7 @@ export const leaveLobby = (playerId, code) => {
     }
 
     // Remove player
-    lobby.removePlayer(player);
+    lobby.removeTeamAndRole(player);
     playerToLobby.delete(playerId);
 
     // TODO: If host leaves, end lobby
@@ -206,6 +206,53 @@ export const leaveLobby = (playerId, code) => {
     return { success: true, lobby: getLobbySnapshot(lobby) };
 };
 
+// Start game (host only)
+export const startGame = (playerId, code) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+
+    if (lobby.getHost().id !== playerId) {
+        return { success: false, message: 'Only host can start the game' };
+    }
+
+    if (lobby.getGamePhase() !== 'pregame') {
+        return { success: false, message: 'Game has already started' };
+    }
+
+    if (!lobby.getBlueCaptain() || !lobby.getRedCaptain()) {
+        return { success: false, message: 'Both teams must have a captain to start the game' };
+    }
+
+    // TODO: Initialize basic game state
+    // lobby.gamePhase = 'playing';
+    // lobby.gameState.currentRoundNumber = 1;
+    // lobby.gameState.currentRound = { startedAt: Date.now() };
+
+    return { success: true, lobby: getLobbySnapshot(lobby), test: true };
+};
+
+// End lobby (host only)
+export const endLobby = (playerId, code) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+         return { success: false, message: 'Lobby not found' };
+    }
+
+    if (lobby.getHost().id !== playerId) {
+        return { success: false, message: 'Only host can end the lobby' };
+    }
+
+    // Remove player->lobby mappings
+    const allPlayers = [...lobby.getBlueTeam(), ...lobby.getRedTeam()];
+    for (const p of allPlayers) {
+        playerToLobby.delete(p.id);
+    }
+    lobbyStore.delete(code);
+
+    return { success: true, lobbyEnded: true };
+};
 // Add player to team with less players
 const addPlayerToSmallerTeam = (player, lobby) => {
     if (lobby.getBlueTeamSize() <= lobby.getRedTeamSize()) {
