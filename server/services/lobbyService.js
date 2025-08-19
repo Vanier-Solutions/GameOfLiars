@@ -278,6 +278,23 @@ export const endLobby = (playerId, code) => {
     return { success: true, lobbyEnded: true };
 };
 
+// Team select
+export const teamSelect = (playerId, code, team, isCaptain) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+    if (lobby.getGamePhase() !== 'pregame') {
+        return { success: false, message: 'Game has already started' };
+    }
+
+    const player = lobby.getAllPlayers().find(p => p.id === playerId);
+    if (!player) {
+        return { success: false, message: 'Player not found' };
+    }
+    
+}
+
 
 // Add player to team with less players
 const addPlayerToSmallerTeam = (player, lobby) => {
