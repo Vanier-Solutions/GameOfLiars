@@ -16,7 +16,7 @@ interface Player {
   name: string
   isCaptain?: boolean
   isHost?: boolean
-  team?: "blue" | "red" | null
+  team?: "blue" | "red" 
 }
 
 interface GameSettings {
@@ -37,6 +37,8 @@ export default function LobbyPage() {
   const [isHost, setIsHost] = useState<boolean>(false)
   const [hasCaptains, setHasCaptains] = useState<boolean>(false)
   const navigate = useNavigate()
+  
+  const MAX_TEAM_SIZE = 8;
 
   useEffect(() => {
     // Decode token to determine host status for UI
@@ -182,6 +184,18 @@ export default function LobbyPage() {
           description: `${player.name} was kicked from the lobby`,
         })
       })
+
+      // Handle player team changed
+      addSocketListener('player-team-changed', (data) => {
+        const { player, lobby } = data
+        setBlueTeam(lobby.blueTeam)
+        setRedTeam(lobby.redTeam)
+        setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
+        toast({
+          title: 'Team Updated',
+          description: `${player.name} joined the ${player.team} team${player.isCaptain ? ' as captain' : ''}`,
+        })
+      })
     }
 
     setupSocketListeners()
@@ -194,6 +208,7 @@ export default function LobbyPage() {
       removeSocketListener('lobby-updated')
       removeSocketListener('lobby-ended')
       removeSocketListener('player-kicked')
+      removeSocketListener('player-team-changed')
     }
   }, [navigate])
 
@@ -342,6 +357,44 @@ export default function LobbyPage() {
     }
   }
 
+  const handleJoinTeam = async (team: 'blue' | 'red', isCaptain: boolean = false) => {
+    try {
+      const token = localStorage.getItem('gameToken')
+      if (!token) return
+      
+      const res = await fetch(`${getBaseUrl()}/api/lobby/teamSelect`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ team, isCaptain })
+      })
+      
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to join team')
+      
+      toast({ 
+        title: `Joined ${team} team${isCaptain ? ' as captain' : ''}!`,
+        description: 'Your team selection has been updated.'
+      })
+      
+      // Update local state with new lobby data
+      if (data.lobby) {
+        setBlueTeam(data.lobby.blueTeam)
+        setRedTeam(data.lobby.redTeam)
+        setHasCaptains(Boolean(data.lobby.captains?.blue && data.lobby.captains?.red))
+        
+      }
+    } catch (e: any) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Team join failed', 
+        description: e.message 
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/10 via-slate-900 to-red-900/10"></div>
@@ -359,14 +412,14 @@ export default function LobbyPage() {
           {/* Blue Team */}
           <Card className="bg-slate-800/90 border-slate-700 backdrop-blur-sm">
             <CardHeader className="pb-4">
-              <CardTitle className="text-blue-400 text-center text-xl">Blue Team ({blueTeam.length}/6)</CardTitle>
+              <CardTitle className="text-blue-400 text-center text-xl">Blue Team ({blueTeam.length}/{MAX_TEAM_SIZE})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Captain Slot */}
               <CaptainSlot 
                 captain={blueTeam.find(player => player.isCaptain)}
                 teamColor="blue"
-                onJoinAsCaptain={() => {}}
+                onJoinAsCaptain={() => handleJoinTeam('blue', true)}
                 onKick={() => {}}
               />
 
@@ -376,10 +429,11 @@ export default function LobbyPage() {
               ))}
 
               {/* Join as Member Button */}
-              {blueTeam.length < 6 && (
+              {blueTeam.length < MAX_TEAM_SIZE && (
                 <Button
                   variant="outline"
                   className="w-full border-blue-500 text-blue-400 hover:bg-blue-500/10 bg-transparent"
+                  onClick={() => handleJoinTeam('blue', false)}
                 >
                   Join as Member
                 </Button>
@@ -468,14 +522,14 @@ export default function LobbyPage() {
           {/* Red Team */}
           <Card className="bg-slate-800/90 border-slate-700 backdrop-blur-sm">
             <CardHeader className="pb-4">
-              <CardTitle className="text-red-400 text-center text-xl">Red Team ({redTeam.length}/6)</CardTitle>
+              <CardTitle className="text-red-400 text-center text-xl">Red Team ({redTeam.length}/{MAX_TEAM_SIZE})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Captain Slot */}
               <CaptainSlot 
                 captain={redTeam.find(player => player.isCaptain)}
                 teamColor="red"
-                onJoinAsCaptain={() => {}}
+                onJoinAsCaptain={() => handleJoinTeam('red', true)}
                 onKick={() => {}}
               />
 
@@ -485,10 +539,11 @@ export default function LobbyPage() {
               ))}
 
               {/* Join as Member Button */}
-              {redTeam.length < 6 && (
+              {redTeam.length < MAX_TEAM_SIZE && (
                 <Button
                   variant="outline"
                   className="w-full border-red-500 text-red-400 hover:bg-red-500/10 bg-transparent"
+                  onClick={() => handleJoinTeam('red', false)}
                 >
                   Join as Member
                 </Button>

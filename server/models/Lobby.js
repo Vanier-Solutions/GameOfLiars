@@ -34,9 +34,6 @@ export class Lobby {
 
     setPlayer(player, team, isCaptain=false) {
         if (team === "blue") {
-            if (this.blueTeam.includes(player)) {
-                throw new Error("Player is already on blue team");
-            }
             if (isCaptain && this.getBlueCaptain()) {
                 throw new Error("Blue Captain already exists");
             }
@@ -48,9 +45,6 @@ export class Lobby {
                 this.setCaptain(player, "blue");
             }
         } else if (team === "red") {
-            if (this.redTeam.includes(player)) {
-                throw new Error("Player is already on red team");
-            }
             if (isCaptain && this.getRedCaptain()) {
                 throw new Error("Red Captain already exists");
             }
@@ -77,7 +71,7 @@ export class Lobby {
         } else if (player === this.redCaptain) {
             this.redCaptain = null;
         }
-        player.setTeam(null, null);
+        player.setTeam(null, false);
     }
 
     removePlayer(player) {

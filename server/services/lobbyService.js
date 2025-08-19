@@ -114,41 +114,6 @@ export const joinLobby = (playerName, code) => {
 };
 
 
-// Set player team
-export const setPlayerTeam = (playerid, code, team, isCap=false) => {
-    const lobby = lobbyStore.get(code);
-    if (!lobby) {
-        return { success: false, message: 'Lobby not found' };
-    }
-
-    const player = lobby.getAllPlayers().find(p => p.id === playerid);
-    if (!player) {
-        return { success: false, message: 'Player not found' };
-    }
-
-    try {
-        if (team === 'blue' && lobby.getBlueTeamSize() >= lobby.getMaxTeamSize()) {
-            return { success: false, message: 'Blue team is full' };
-        }
-        if (team === 'red' && lobby.getRedTeamSize() >= lobby.getMaxTeamSize()) {
-            return { success: false, message: 'Red team is full' };
-        }
-
-        lobby.setPlayer(player, team, isCap);
-        
-        // Emit socket event for team change
-        emitPlayerTeamChanged(code, {
-            id: player.id,
-            name: player.getName(),
-            team: player.getTeam(),
-            isCaptain: player.getIsCaptain()
-        }, getLobbySnapshot(lobby));
-        
-        return { success: true, lobby: getLobbySnapshot(lobby) };
-    } catch (error) {
-        return { success: false, message: error.message };
-    }
-}
 
 // Update lobby settings (host only)
 export const updateSettings = (playerId, code, settings) => {
@@ -284,15 +249,34 @@ export const teamSelect = (playerId, code, team, isCaptain) => {
     if (!lobby) {
         return { success: false, message: 'Lobby not found' };
     }
-    if (lobby.getGamePhase() !== 'pregame') {
-        return { success: false, message: 'Game has already started' };
-    }
 
     const player = lobby.getAllPlayers().find(p => p.id === playerId);
     if (!player) {
         return { success: false, message: 'Player not found' };
     }
-    
+
+    try {
+        if (team === 'blue' && lobby.getBlueTeamSize() >= lobby.getMaxTeamSize()) {
+            return { success: false, message: 'Blue team is full' };
+        }
+        if (team === 'red' && lobby.getRedTeamSize() >= lobby.getMaxTeamSize()) {
+            return { success: false, message: 'Red team is full' };
+        }
+
+        lobby.setPlayer(player, team, isCaptain);
+        
+        // Emit socket event for team change
+        emitPlayerTeamChanged(code, {
+            id: player.id,
+            name: player.getName(),
+            team: player.getTeam(),
+            isCaptain: player.getIsCaptain()
+        }, getLobbySnapshot(lobby));
+        
+        return { success: true, lobby: getLobbySnapshot(lobby) };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
 }
 
 
@@ -311,6 +295,7 @@ export const getLobbySnapshot = (lobby) => {
         id: player.id,
         name: player.getName(),
         team: player.getTeam(),
+        isCaptain: player.getIsCaptain(),
         isConnected: player.getIsConnected(),
         isHost: player.getIsHost()
     });
