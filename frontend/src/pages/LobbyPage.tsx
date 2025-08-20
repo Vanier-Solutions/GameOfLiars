@@ -487,9 +487,11 @@ export default function LobbyPage() {
                       min="1"
                       max="20"
                       value={gameSettings.rounds}
-                      onChange={(e) =>
-                        setGameSettings((prev) => ({ ...prev, rounds: Number.parseInt(e.target.value) || 1 }))
-                      }
+                      onChange={(e) => {
+                        const value = Number.parseInt(e.target.value) || 1;
+                        const clampedValue = Math.max(1, Math.min(20, value));
+                        setGameSettings((prev) => ({ ...prev, rounds: clampedValue }));
+                      }}
                       disabled={!isHost}
                       className="bg-slate-700/50 border-slate-600 text-white"
                     />
@@ -502,9 +504,11 @@ export default function LobbyPage() {
                       min="15"
                       max="120"
                       value={gameSettings.roundLimit}
-                      onChange={(e) =>
-                        setGameSettings((prev) => ({ ...prev, roundLimit: Number.parseInt(e.target.value) || 15 }))
-                      }
+                      onChange={(e) => {
+                        const value = Number.parseInt(e.target.value) || 15;
+                        const clampedValue = Math.max(15, Math.min(120, value));
+                        setGameSettings((prev) => ({ ...prev, roundLimit: clampedValue }));
+                      }}
                       disabled={!isHost}
                       className="bg-slate-700/50 border-slate-600 text-white"
                     />
