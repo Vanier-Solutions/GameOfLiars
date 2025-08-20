@@ -7,7 +7,8 @@ import {
     emitPlayerLeft, 
     emitPlayerTeamChanged, 
     emitPlayerKicked, 
-    emitLobbyEnded 
+    emitLobbyEnded,
+    emitSettingsUpdated
 } from '../socket/socketService.js';
 
 const lobbyStore = new Map();
@@ -138,7 +139,9 @@ export const updateSettings = (playerId, code, settings) => {
 
     // Update settings
     Object.assign(lobby.settings, settings);
-    
+
+    emitSettingsUpdated(code, getLobbySnapshot(lobby));
+
     return { success: true, lobby: getLobbySnapshot(lobby) };
 };
 

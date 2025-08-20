@@ -130,6 +130,14 @@ export const setupSocketHandlers = (io) => {
             }
         });
 
+        // Handle settings updated
+        socket.on('settings-updated', (data) => {
+            const { lobbyCode } = data;
+            if (lobbyCode) {
+                socket.to(lobbyCode).emit('settings-updated', data);
+            }
+        });
+
         // Handle chat messages
         socket.on('chat-message', (data) => {
             const { lobbyCode, message, playerId, playerName } = data;

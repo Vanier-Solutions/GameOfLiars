@@ -172,6 +172,7 @@ export interface SocketEvents {
   'player-kicked': (data: { player: any; kickedBy: string; lobby: any; timestamp: string }) => void;
   'lobby-updated': (data: { lobby: any; updateType: string; timestamp: string }) => void;
   'lobby-ended': (data: { reason: string; timestamp: string }) => void;
+  'settings-updated': (data: { lobby: any; timestamp: string }) => void;
   'chat-message': (data: { message: string; playerId: string; playerName: string; timestamp: string }) => void;
 }
 

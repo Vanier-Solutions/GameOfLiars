@@ -94,18 +94,16 @@ export const emitLobbyEnded = (lobbyCode, reason) => {
 };
 
 /**
- * Emit a lobby updated event to all players in a lobby
+ * Emit a settings updated event to all players in a lobby
  * @param {string} lobbyCode - The lobby code
  * @param {Object} lobby - Updated lobby state
- * @param {string} updateType - Type of update (e.g., 'settings', 'game-phase')
  */
-export const emitLobbyUpdated = (lobbyCode, lobby, updateType) => {
-    emitToLobby(lobbyCode, 'lobby-updated', {
+export const emitSettingsUpdated = (lobbyCode, lobby) => {
+    emitToLobby(lobbyCode, 'settings-updated', {
         lobby,
-        updateType,
         timestamp: new Date().toISOString()
     });
-};
+}
 
 /**
  * Emit a chat message to all players in a lobby

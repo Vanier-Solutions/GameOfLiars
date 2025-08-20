@@ -184,3 +184,20 @@ export const teamSelect = async (req, res) => {
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 }
+
+export const updateSettings = async (req, res) => {
+    try {
+        const token = getBearerToken(req);
+        if (!token) return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const payload = lobbyService.verifyToken(token);
+        if (!payload) return res.status(401).json({ success: false, message: 'Invalid token' });
+
+        const result = lobbyService.updateSettings(payload.sub, payload.lobby, req.body.settings);
+        
+        const status = result.success ? 200 : (result.message?.includes('not found') ? 404 : 400);
+        return res.status(status).json(result);
+    } catch (error) {
+        console.error('Error updating settings:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+}

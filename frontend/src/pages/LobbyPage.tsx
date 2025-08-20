@@ -196,6 +196,13 @@ export default function LobbyPage() {
           description: `${player.name} joined the ${player.team} team${player.isCaptain ? ' as captain' : ''}`,
         })
       })
+
+      // Handle settings updated
+      addSocketListener('settings-updated', (data) => {
+        const { lobby } = data;
+        setGameSettings(lobby.settings);
+      })
+
     }
 
     setupSocketListeners()
@@ -209,6 +216,7 @@ export default function LobbyPage() {
       removeSocketListener('lobby-ended')
       removeSocketListener('player-kicked')
       removeSocketListener('player-team-changed')
+      removeSocketListener('settings-updated')
     }
   }, [navigate])
 
@@ -395,6 +403,30 @@ export default function LobbyPage() {
     }
   }
 
+  const handleUpdateSettings = async () => {
+    try {
+      const token = localStorage.getItem('gameToken');
+      if (!token) return;
+
+      const res = await fetch(`${getBaseUrl()}/api/lobby/updateSettings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ settings: gameSettings })
+      })
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update settings');
+      }
+      toast({ title: 'Settings updated' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update settings failed', description: e.message });
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/10 via-slate-900 to-red-900/10"></div>
@@ -446,8 +478,8 @@ export default function LobbyPage() {
             <CardContent className="p-6 space-y-6">
               {/* Game Settings */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4">Game Settings</h3>
-                <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white mb-3">Game Settings</h3>
+                <div className="space-y-3">
                   <div>
                     <label className="text-sm text-slate-300 block mb-2">Rounds (1-20)</label>
                     <Input
@@ -493,7 +525,7 @@ export default function LobbyPage() {
                         <Plus className="w-4 h-4" />
                       </Button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 mb-3">
                       {gameSettings.tags.map((tag) => (
                         <Badge
                           key={tag}
@@ -513,6 +545,18 @@ export default function LobbyPage() {
                         </Badge>
                       ))}
                     </div>
+                  </div>
+
+                  <div className="pt-2">
+                    { isHost && (
+                      <Button 
+                      onClick={handleUpdateSettings}
+                      disabled={!isHost}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        Update Settings
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
