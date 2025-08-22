@@ -172,16 +172,26 @@ export default function LobbyPage() {
         navigate('/')
       })
 
-      // Handle player kicked
+      // Handle when current player gets kicked
+      addSocketListener('you-were-kicked', (_data) => {
+        toast({
+          variant: 'destructive',
+          title: 'You were kicked',
+          description: 'You have been kicked from the lobby',
+        })
+        localStorage.removeItem('gameToken')
+        navigate('/')
+      })
+
+      // Handle player kicked (for other players)
       addSocketListener('player-kicked', (data) => {
-        const { player, lobby } = data
-        setBlueTeam(lobby.blueTeam)
-        setRedTeam(lobby.redTeam)
-        setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
+        setBlueTeam(data.lobby.blueTeam)
+        setRedTeam(data.lobby.redTeam)
+        setHasCaptains(Boolean(data.lobby.captains?.blue && data.lobby.captains?.red))
         toast({
           variant: 'destructive',
           title: 'Player Kicked',
-          description: `${player.name} was kicked from the lobby`,
+          description: `${data.player.name} was kicked from the lobby`,
         })
       })
 
@@ -214,6 +224,7 @@ export default function LobbyPage() {
       removeSocketListener('player-disconnected')
       removeSocketListener('lobby-updated')
       removeSocketListener('lobby-ended')
+      removeSocketListener('you-were-kicked')
       removeSocketListener('player-kicked')
       removeSocketListener('player-team-changed')
       removeSocketListener('settings-updated')
@@ -255,14 +266,16 @@ export default function LobbyPage() {
         {player.isCaptain && <Crown className="w-4 h-4 text-yellow-400" />}
         <span className="text-white font-medium">{player.name}</span>
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onKick}
-        className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1"
-      >
-        <Trash2 className="w-4 h-4" />
-      </Button>
+      {isHost && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onKick}
+          className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
     </div>
   )
 
@@ -283,14 +296,16 @@ export default function LobbyPage() {
               <Crown className="w-5 h-5 text-yellow-400" />
               <span className="text-white font-bold text-lg">{captain.name}</span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onKick}
-              className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {isHost && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onKick}
+                className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       )
@@ -427,6 +442,28 @@ export default function LobbyPage() {
     }
   }
 
+  const handleKickPlayer = async (playerId: string) => {
+    try {
+      const token = localStorage.getItem('gameToken');
+      if (!token) return;
+
+      const res = await fetch(`${getBaseUrl()}/api/lobby/kickPlayer`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ playerId: playerId })
+      })
+
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to kick player');
+      toast({ title: 'Player kicked' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Kick player failed', description: e.message });
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/10 via-slate-900 to-red-900/10"></div>
@@ -452,12 +489,15 @@ export default function LobbyPage() {
                 captain={blueTeam.find(player => player.isCaptain)}
                 teamColor="blue"
                 onJoinAsCaptain={() => handleJoinTeam('blue', true)}
-                onKick={() => {}}
+                onKick={() => {
+                  const captain = blueTeam.find(player => player.isCaptain);
+                  if (captain) handleKickPlayer(captain.id);
+                }}
               />
 
               {/* Regular Team Members */}
               {blueTeam.filter(player => !player.isCaptain).map((player) => (
-                <PlayerCard key={player.id} player={player} onKick={() => {}} />
+                <PlayerCard key={player.id} player={player} onKick={() => handleKickPlayer(player.id)} />
               ))}
 
               {/* Join as Member Button */}
@@ -578,12 +618,15 @@ export default function LobbyPage() {
                 captain={redTeam.find(player => player.isCaptain)}
                 teamColor="red"
                 onJoinAsCaptain={() => handleJoinTeam('red', true)}
-                onKick={() => {}}
+                onKick={() => {
+                  const captain = redTeam.find(player => player.isCaptain);
+                  if (captain) handleKickPlayer(captain.id);
+                }}
               />
 
               {/* Regular Team Members */}
               {redTeam.filter(player => !player.isCaptain).map((player) => (
-                <PlayerCard key={player.id} player={player} onKick={() => {}} />
+                <PlayerCard key={player.id} player={player} onKick={() => handleKickPlayer(player.id)} />
               ))}
 
               {/* Join as Member Button */}

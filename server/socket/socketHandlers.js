@@ -138,6 +138,14 @@ export const setupSocketHandlers = (io) => {
             }
         });
 
+        // Handle player kicked
+        socket.on('player-kicked', (data) => {
+            const { lobbyCode, player, kickedBy, lobby } = data;
+            if (lobbyCode) {
+                socket.to(lobbyCode).emit('player-kicked', data);
+            }
+        });
+
         // Handle chat messages
         socket.on('chat-message', (data) => {
             const { lobbyCode, message, playerId, playerName } = data;

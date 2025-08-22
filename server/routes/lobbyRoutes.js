@@ -1,5 +1,6 @@
 import express from "express";
-import { createLobby, joinLobby, getLobby, leaveLobby, startGame, endLobby, teamSelect, updateSettings } from '../controllers/lobbyController.js';
+import { createLobby, joinLobby, getLobby, leaveLobby, startGame,
+    endLobby, teamSelect, updateSettings, kickPlayer } from '../controllers/lobbyController.js';
 
 const router = express.Router();
 
@@ -26,5 +27,8 @@ router.post('/teamSelect', teamSelect);
 
 // POST /api/lobby/updateSettings
 router.post('/updateSettings', updateSettings);
+
+// POST /api/lobby/kickPlayer
+router.post('/kickPlayer', kickPlayer);
 
 export default router;

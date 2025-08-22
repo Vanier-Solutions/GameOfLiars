@@ -170,6 +170,7 @@ export interface SocketEvents {
   'player-disconnected': (data: { playerId: string; lobbyCode: string; timestamp: string }) => void;
   'player-team-changed': (data: { player: any; lobby: any; timestamp: string }) => void;
   'player-kicked': (data: { player: any; kickedBy: string; lobby: any; timestamp: string }) => void;
+  'you-were-kicked': (data: { reason: string; kickedBy: string; timestamp: string }) => void;
   'lobby-updated': (data: { lobby: any; updateType: string; timestamp: string }) => void;
   'lobby-ended': (data: { reason: string; timestamp: string }) => void;
   'settings-updated': (data: { lobby: any; timestamp: string }) => void;

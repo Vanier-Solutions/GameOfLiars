@@ -121,6 +121,21 @@ export const emitChatMessage = (lobbyCode, message, playerId, playerName) => {
     });
 };
 
+/**
+ * Emit a you were kicked event to a specific player
+ * @param {string} playerId - Player ID
+ * @param {string} reason - Reason for being kicked
+ * @param {string} kickedBy - Player ID of the one who kicked
+ */
+export const emitYouWereKicked = (playerId, reason, kickedBy) => {
+    emitToPlayer(playerId, 'you-were-kicked', {
+        reason,
+        kickedBy,
+        timestamp: new Date().toISOString()
+    });
+}
+
+
 // ===== UTILITY FUNCTIONS =====
 
 /**

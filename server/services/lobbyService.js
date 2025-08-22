@@ -8,7 +8,8 @@ import {
     emitPlayerTeamChanged, 
     emitPlayerKicked, 
     emitLobbyEnded,
-    emitSettingsUpdated
+    emitSettingsUpdated,
+    emitYouWereKicked
 } from '../socket/socketService.js';
 
 const lobbyStore = new Map();
@@ -172,10 +173,12 @@ export const kickPlayer = (actorId, code, targetId) => {
         isHost: targetPlayer.getIsHost()
     };
 
+    // Send direct message to kicked player BEFORE removing them
+    emitYouWereKicked(targetPlayer.id, 'You were kicked from the lobby', actorId);
+
     lobby.removePlayer(targetPlayer);
     playerToLobby.delete(targetPlayer.id);
 
-    // Emit socket event for player kicked
     emitPlayerKicked(code, playerInfo, actorId, getLobbySnapshot(lobby));
 
     return { success: true, lobby: getLobbySnapshot(lobby) };
