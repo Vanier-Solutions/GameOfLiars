@@ -285,6 +285,14 @@ export const teamSelect = (playerId, code, team, isCaptain) => {
     }
 }
 
+// Start game
+export const startGame = (playerId, code) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+}
+
 
 // Add player to team with less players
 const addPlayerToSmallerTeam = (player, lobby) => {
