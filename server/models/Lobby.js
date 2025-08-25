@@ -20,9 +20,9 @@ export class Lobby {
         this.redTeam = []; 
 
         this.gamePhase = "pregame" // "pregame", "playing", "ended"
-        this.rounds = []
-        this.usedQuestions = [] // Track used questions IDs
         this.gameState = {
+            rounds: [],
+            questions: [],
             currentRoundNumber: 0,
             scores: {
                 blue: 0,

@@ -13,7 +13,6 @@ import {
     emitGameStarted,
     emitGameEnded
 } from '../socket/socketService.js';
-import QuestionService from './questionService.js';
 
 const lobbyStore = new Map();
 const playerToLobby = new Map(); // playerId -> lobbyCode
