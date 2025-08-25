@@ -121,6 +121,34 @@ export const emitChatMessage = (lobbyCode, message, playerId, playerName) => {
     });
 };
 
+// ===== GAME EVENTS =====
+
+/**
+ * Emit when a game starts so clients can navigate to the game screen
+ * @param {string} lobbyCode
+ * @param {Object} payload - Minimal info to start the game client
+ */
+export const emitGameStarted = (lobbyCode, payload) => {
+    emitToLobby(lobbyCode, 'game-started', {
+        lobbyCode,
+        ...payload,
+        timestamp: new Date().toISOString()
+    });
+};
+
+/**
+ * Emit when the game ends so clients return to the lobby
+ * @param {string} lobbyCode
+ * @param {Object} payload
+ */
+export const emitGameEnded = (lobbyCode, payload) => {
+    emitToLobby(lobbyCode, 'game-ended', {
+        lobbyCode,
+        ...payload,
+        timestamp: new Date().toISOString()
+    });
+};
+
 /**
  * Emit a you were kicked event to a specific player
  * @param {string} playerId - Player ID

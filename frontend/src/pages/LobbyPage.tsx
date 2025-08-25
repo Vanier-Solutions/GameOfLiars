@@ -213,6 +213,13 @@ export default function LobbyPage() {
         setGameSettings(lobby.settings);
       })
 
+      // Handle game started -> navigate to game page
+      addSocketListener('game-started', (data) => {
+        if (data?.lobbyCode === gameCode) {
+          navigate(`/game/${gameCode}`)
+        }
+      })
+
     }
 
     setupSocketListeners()
@@ -228,6 +235,7 @@ export default function LobbyPage() {
       removeSocketListener('player-kicked')
       removeSocketListener('player-team-changed')
       removeSocketListener('settings-updated')
+      removeSocketListener('game-started')
     }
   }, [navigate])
 

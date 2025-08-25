@@ -148,15 +148,42 @@ export const setupSocketHandlers = (io) => {
 
         // Handle chat messages
         socket.on('chat-message', (data) => {
-            const { lobbyCode, message, playerId, playerName } = data;
+            const { lobbyCode, message, playerId, playerName, chatType = 'game' } = data;
             if (lobbyCode) {
-                // Broadcast to all players in the lobby including sender
-                io.to(lobbyCode).emit('chat-message', {
-                    message,
-                    playerId,
-                    playerName,
-                    timestamp: new Date().toISOString()
-                });
+                // Get player info to include team
+                const player = lobbyService.getPlayerById(playerId);
+                const team = player ? player.getTeam() : 'blue';
+                
+                // For team chat, only send to players on the same team
+                if (chatType === 'team') {
+                    const lobby = lobbyService.getLobbyByCode(lobbyCode);
+                    if (lobby) {
+                        const teamPlayers = team === 'blue' ? lobby.getBlueTeam() : lobby.getRedTeam();
+                        teamPlayers.forEach(p => {
+                            const socketId = playerSockets.get(p.id);
+                            if (socketId) {
+                                io.to(socketId).emit('chat-message', {
+                                    message,
+                                    playerId,
+                                    playerName,
+                                    team,
+                                    chatType,
+                                    timestamp: new Date().toISOString()
+                                });
+                            }
+                        });
+                    }
+                } else {
+                    // For game chat, broadcast to all players in the lobby
+                    io.to(lobbyCode).emit('chat-message', {
+                        message,
+                        playerId,
+                        playerName,
+                        team,
+                        chatType,
+                        timestamp: new Date().toISOString()
+                    });
+                }
             }
         });
     });

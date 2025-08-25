@@ -9,8 +9,11 @@ import {
     emitPlayerKicked, 
     emitLobbyEnded,
     emitSettingsUpdated,
-    emitYouWereKicked
+    emitYouWereKicked,
+    emitGameStarted,
+    emitGameEnded
 } from '../socket/socketService.js';
+import QuestionService from './questionService.js';
 
 const lobbyStore = new Map();
 const playerToLobby = new Map(); // playerId -> lobbyCode
@@ -287,11 +290,51 @@ export const teamSelect = (playerId, code, team, isCaptain) => {
 
 // Start game
 export const startGame = (playerId, code) => {
-    const lobby = lobbyStore.get(code);
-    if (!lobby) {
-        return { success: false, message: 'Lobby not found' };
-    }
-}
+	const lobby = lobbyStore.get(code);
+	if (!lobby) {
+		return { success: false, message: 'Lobby not found' };
+	}
+
+	// Only host can start the game
+	if (lobby.getHost().id !== playerId) {
+		return { success: false, message: 'Only host can start the game' };
+	}
+
+	// Must have captains selected
+	if (!lobby.getBlueCaptain() || !lobby.getRedCaptain()) {
+		return { success: false, message: 'Both teams must have a captain' };
+	}
+
+	// Prevent duplicate starts
+	if (lobby.getGamePhase() !== 'pregame') {
+		return { success: false, message: 'Game already started' };
+	}
+
+	// Set game state
+	lobby.gamePhase = 'playing';
+	lobby.gameState.currentRoundNumber = 0;
+	lobby.rounds = [];
+
+	const snapshot = getLobbySnapshot(lobby);
+
+	// Notify clients to transition to the game view
+	emitGameStarted(code, { lobby: snapshot });
+
+	// Asynchronously generate questions (fire-and-forget)
+	const questionService = new QuestionService();
+	const { rounds, tags } = lobby.getSettings();
+	(async () => {
+		try {
+			const generated = await questionService.generateQuestion(rounds, tags);
+			lobby.rounds = Array.isArray(generated) ? generated : [];
+		} catch (err) {
+			console.error('Failed to generate questions:', err);
+			lobby.rounds = [];
+		}
+	})();
+
+	return { success: true, lobby: snapshot };
+};
 
 
 // Add player to team with less players

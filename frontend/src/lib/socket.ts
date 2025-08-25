@@ -54,7 +54,7 @@ class SocketService {
   }
 
   // Send a chat message
-  sendChatMessage(lobbyCode: string, message: string, playerId: string, playerName: string) {
+  sendChatMessage(lobbyCode: string, message: string, playerId: string, playerName: string, team?: string, chatType: 'game' | 'team' = 'game') {
     if (!this.socket) {
       console.error('Socket not connected. Call connect() first.');
       return;
@@ -65,6 +65,8 @@ class SocketService {
       message,
       playerId,
       playerName,
+      team,
+      chatType,
     });
   }
 
@@ -174,7 +176,9 @@ export interface SocketEvents {
   'lobby-updated': (data: { lobby: any; updateType: string; timestamp: string }) => void;
   'lobby-ended': (data: { reason: string; timestamp: string }) => void;
   'settings-updated': (data: { lobby: any; timestamp: string }) => void;
-  'chat-message': (data: { message: string; playerId: string; playerName: string; timestamp: string }) => void;
+  'chat-message': (data: { message: string; playerId: string; playerName: string; team: string; chatType: 'game' | 'team'; timestamp: string }) => void;
+  'game-started': (data: { lobbyCode: string; lobby: any; timestamp: string }) => void;
+  'game-ended': (data: { lobbyCode: string; reason?: string; timestamp: string }) => void;
 }
 
 // Helper function to add typed event listeners

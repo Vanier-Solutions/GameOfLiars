@@ -1,5 +1,17 @@
 class QuestionService {
     async generateQuestion(rounds, tags) {
+
+        // Temp
+        res = [];
+        for (let i = 0; i < rounds; i++) {
+            res.push({
+                question: "What is the capital of France?",
+                answer: "Paris",
+                tag: "Geography"
+            });
+        }
+        return res;
+        
         const response = await fetch(
             "https://api-inference.huggingface.co/models/Qwen/Qwen3-4B-Instruct-2507",
             {
