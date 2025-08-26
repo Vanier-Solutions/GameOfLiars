@@ -1,6 +1,7 @@
 import { Lobby } from '../models/Lobby.js';
 import { Player } from '../models/Player.js';
 import { generateGameCode } from '../utils/generateCode.js';
+import * as gameService from './gameService.js';
 import jwt from 'jsonwebtoken';
 import { 
     emitPlayerJoined, 
@@ -14,7 +15,7 @@ import {
     emitGameEnded
 } from '../socket/socketService.js';
 
-const lobbyStore = new Map();
+export const lobbyStore = new Map();
 const playerToLobby = new Map(); // playerId -> lobbyCode
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -288,7 +289,7 @@ export const teamSelect = (playerId, code, team, isCaptain) => {
 }
 
 // Start game
-export const startGame = (playerId, code) => {
+export const startGame = async (playerId, code) => {
 	const lobby = lobbyStore.get(code);
 	if (!lobby) {
 		return { success: false, message: 'Lobby not found' };
@@ -309,30 +310,12 @@ export const startGame = (playerId, code) => {
 		return { success: false, message: 'Game already started' };
 	}
 
-	// Set game state
-	lobby.gamePhase = 'playing';
-	lobby.gameState.currentRoundNumber = 0;
-	lobby.rounds = [];
-
-	const snapshot = getLobbySnapshot(lobby);
-
-	// Notify clients to transition to the game view
-	emitGameStarted(code, { lobby: snapshot });
-
-	// Asynchronously generate questions (fire-and-forget)
-	const questionService = new QuestionService();
-	const { rounds, tags } = lobby.getSettings();
-	(async () => {
-		try {
-			const generated = await questionService.generateQuestion(rounds, tags);
-			lobby.rounds = Array.isArray(generated) ? generated : [];
-		} catch (err) {
-			console.error('Failed to generate questions:', err);
-			lobby.rounds = [];
-		}
-	})();
-
-	return { success: true, lobby: snapshot };
+	try {
+		return await gameService.startGame(lobby);
+	} catch (error) {
+		console.error('Error starting game in lobbyService:', error);
+		return { success: false, message: 'Failed to start game' };
+	}
 };
 
 

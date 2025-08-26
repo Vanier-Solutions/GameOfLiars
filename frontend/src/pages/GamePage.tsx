@@ -38,7 +38,7 @@ function BanditLogo(props: { className?: string }) {
   );
 }
 
-function TeamCard({ side, color, score, maxScore, players, youIsCaptain }: { side: "Blue" | "Red"; color: "blue" | "red"; score: number; maxScore: number; players: Player[]; youIsCaptain?: boolean; }) {
+function TeamCard({ side, color, score, maxScore, players, currentPlayerId }: { side: "Blue" | "Red"; color: "blue" | "red"; score: number; maxScore: number; players: Player[]; currentPlayerId?: string; }) {
   const colorClasses = color === "blue" ? "from-indigo-500 to-blue-600" : "from-rose-600 to-red-600";
   const panelBg = color === "blue" ? "bg-indigo-50/5" : "bg-rose-50/5";
   return (
@@ -51,14 +51,14 @@ function TeamCard({ side, color, score, maxScore, players, youIsCaptain }: { sid
         </div>
       </div>
       <div className={`${panelBg} p-3 space-y-2 hidden lg:block`}>
-        {players.map((p, i) => (
+        {players.map((p) => (
           <div key={p.id} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
             <Users className="h-4 w-4 opacity-80" />
             <span className="text-sm flex-1 truncate">{p.name}</span>
-            {i === 0 && (
+            {p.isCaptain && (
               <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-white/80 text-slate-900">CAPTAIN</span>
             )}
-            {youIsCaptain && i === 0 && (
+            {currentPlayerId === p.id && (
               <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-400/90 text-slate-900">YOU</span>
             )}
           </div>
@@ -68,16 +68,16 @@ function TeamCard({ side, color, score, maxScore, players, youIsCaptain }: { sid
   );
 }
 
-function ScorePillsMobile() {
+function ScorePillsMobile({ blueScore, redScore, maxScore }: { blueScore: number; redScore: number; maxScore: number; }) {
   return (
     <div className="lg:hidden grid grid-cols-2 gap-3">
       <div className="rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-4 py-2 flex items-center justify-between shadow border border-white/10">
         <span className="font-semibold">Blue</span>
-        <span className="font-extrabold">0 / 7</span>
+        <span className="font-extrabold">{blueScore} / {maxScore}</span>
       </div>
       <div className="rounded-xl bg-gradient-to-r from-rose-600 to-red-600 px-4 py-2 flex items-center justify-between shadow border border-white/10">
         <span className="font-semibold">Red</span>
-        <span className="font-extrabold">0 / 7</span>
+        <span className="font-extrabold">{redScore} / {maxScore}</span>
       </div>
     </div>
   );
@@ -130,6 +130,7 @@ export default function GamePage() {
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [blueTeam, setBlueTeam] = useState<Player[]>([]);
   const [redTeam, setRedTeam] = useState<Player[]>([]);
+  const [maxScore, setMaxScore] = useState<number>(7);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -143,13 +144,13 @@ export default function GamePage() {
     socketService.connect();
     socketService.joinLobby(token);
 
-    // Get current player info from token
+    // Get current player base info from token
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       setCurrentPlayer({
         id: payload.sub,
         name: payload.name,
-        team: payload.team || "blue"
+        team: "blue"
       });
     } catch (error) {
       console.error('Failed to parse token:', error);
@@ -184,7 +185,7 @@ export default function GamePage() {
     };
   }, [code, navigate]);
 
-  // Fetch lobby data to populate teams
+  // Fetch lobby data to populate teams and derive current player's team
   useEffect(() => {
     const fetchLobbyData = async () => {
       const token = localStorage.getItem('gameToken');
@@ -198,6 +199,17 @@ export default function GamePage() {
         if (data.success) {
           setBlueTeam(data.data.blueTeam);
           setRedTeam(data.data.redTeam);
+          if (Array.isArray(data.data?.blueTeam) && Array.isArray(data.data?.redTeam)) {
+            const all = [...data.data.blueTeam, ...data.data.redTeam];
+            setCurrentPlayer((prev) => {
+              if (!prev) return prev;
+              const me = all.find((p) => p.id === prev.id);
+              return me ? { ...prev, team: me.team } : prev;
+            });
+          }
+          if (data.data?.settings?.rounds) {
+            setMaxScore(Number(data.data.settings.rounds) || 7);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch lobby data:', error);
@@ -210,6 +222,48 @@ export default function GamePage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Keep teams in sync via socket events during the game
+  useEffect(() => {
+    const syncFromLobby = (lobby: any) => {
+      if (!lobby) return;
+      setBlueTeam(lobby.blueTeam || []);
+      setRedTeam(lobby.redTeam || []);
+      if (lobby?.settings?.rounds) setMaxScore(Number(lobby.settings.rounds) || 7);
+      setCurrentPlayer((prev) => {
+        if (!prev) return prev;
+        const all = [...(lobby.blueTeam || []), ...(lobby.redTeam || [])];
+        const me = all.find((p: any) => p.id === prev.id);
+        return me ? { ...prev, team: me.team } : prev;
+      });
+    };
+
+    const onPlayerJoined = (data: any) => syncFromLobby(data.lobby);
+    const onPlayerLeft = (data: any) => syncFromLobby(data.lobby);
+    const onTeamChanged = (data: any) => syncFromLobby(data.lobby);
+    const onPlayerKicked = (data: any) => syncFromLobby(data.lobby);
+    const onLobbyUpdated = (data: any) => syncFromLobby(data.lobby);
+    const onSettingsUpdated = (data: any) => syncFromLobby(data.lobby);
+    const onGameStarted = (data: any) => syncFromLobby(data.lobby);
+
+    addSocketListener('player-joined', onPlayerJoined as any);
+    addSocketListener('player-left', onPlayerLeft as any);
+    addSocketListener('player-team-changed', onTeamChanged as any);
+    addSocketListener('player-kicked', onPlayerKicked as any);
+    addSocketListener('lobby-updated', onLobbyUpdated as any);
+    addSocketListener('settings-updated', onSettingsUpdated as any);
+    addSocketListener('game-started', onGameStarted as any);
+
+    return () => {
+      removeSocketListener('player-joined', onPlayerJoined as any);
+      removeSocketListener('player-left', onPlayerLeft as any);
+      removeSocketListener('player-team-changed', onTeamChanged as any);
+      removeSocketListener('player-kicked', onPlayerKicked as any);
+      removeSocketListener('lobby-updated', onLobbyUpdated as any);
+      removeSocketListener('settings-updated', onSettingsUpdated as any);
+      removeSocketListener('game-started', onGameStarted as any);
+    };
+  }, []);
 
   const sendMessage = () => {
     if (!chatText.trim() || !currentPlayer) return;
@@ -294,11 +348,11 @@ export default function GamePage() {
       </header>
 
       <main className="relative z-10 mx-auto max-w-6xl px-4 pt-6 pb-16 space-y-6">
-        <ScorePillsMobile />
+        <ScorePillsMobile blueScore={blueTeam.length} redScore={redTeam.length} maxScore={maxScore} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <div className="hidden lg:block lg:col-span-3 xl:col-span-2">
-            <TeamCard side="Blue" color="blue" score={0} maxScore={7} players={blueTeam} />
+            <TeamCard side="Blue" color="blue" score={blueTeam.length} maxScore={maxScore} players={blueTeam} currentPlayerId={currentPlayer?.id} />
           </div>
 
           <div className="lg:col-span-6 xl:col-span-8 space-y-4 order-last lg:order-none">
@@ -378,7 +432,7 @@ export default function GamePage() {
           </div>
 
           <div className="hidden lg:block lg:col-span-3 xl:col-span-2">
-            <TeamCard side="Red" color="red" score={0} maxScore={7} players={redTeam} />
+            <TeamCard side="Red" color="red" score={redTeam.length} maxScore={maxScore} players={redTeam} currentPlayerId={currentPlayer?.id} />
           </div>
         </div>
       </main>
