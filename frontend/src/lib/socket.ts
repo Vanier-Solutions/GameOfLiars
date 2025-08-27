@@ -224,6 +224,7 @@ export interface SocketEvents {
   'round-results': (data: { lobbyCode: string; round: any; scores: { blue: number; red: number }; game: any; timestamp: string }) => void;
   'team-answer-submitted': (data: { team: string; isSteal: boolean; bothSubmitted: boolean; timestamp: string }) => void;
   'answer-processing-started': (data: { message: string; timestamp: string }) => void;
+  'lobby-returned': (data: { lobby: any; message: string; timestamp: string }) => void;
 }
 
 // Helper function to add typed event listeners

@@ -138,8 +138,10 @@ export default function GamePage() {
   const { code } = useParams();
   const navigate = useNavigate();
   const [round, setRound] = useState(1);
-  const [phase, setPhase] = useState<"idle" | "question" | "answered" | "results">("idle");
+  const [phase, setPhase] = useState<"idle" | "question" | "answered" | "results" | "summary">("idle");
   const [roundResults, setRoundResults] = useState<any>(null);
+  const [gameComplete, setGameComplete] = useState(false);
+  const [allRounds, setAllRounds] = useState<any[]>([]);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [chatMode, setChatMode] = useState<"game" | "team">("team");
@@ -233,10 +235,9 @@ export default function GamePage() {
       }
     };
 
-    const handleRoundResults = (data: { round: any; scores: { blue: number; red: number } }) => {
+    const handleRoundResults = (data: { round: any; scores: { blue: number; red: number }; game?: any; isGameEnd?: boolean; gameComplete?: boolean }) => {
       if (data.round) {
         setRoundResults(data.round);
-        setPhase("results");
         
         // Update scores
         if (data.scores) {
@@ -244,8 +245,31 @@ export default function GamePage() {
           setRedScore(data.scores.red);
         }
         
+        // Always show round results first
+        setPhase("results");
         const winner = data.round.winner === 'tie' ? 'It\'s a tie!' : `${data.round.winner} team wins this round!`;
-        toast({ title: 'Round complete!', description: winner });
+        
+        // Check if game is complete
+        if (data.gameComplete && data.game) {
+          setGameComplete(true);
+          setAllRounds(data.game.rounds || []);
+          
+          // Show final round results first, then transition after 5 seconds to summary
+          toast({ title: 'Final Round Complete!', description: winner });
+          
+          setTimeout(() => {
+            setPhase("summary");
+            
+            const finalWinner = data.scores.blue > data.scores.red ? 'Blue' : 
+                               data.scores.red > data.scores.blue ? 'Red' : 'Tie';
+            toast({ 
+              title: 'Game Complete!', 
+              description: `Final winner: ${finalWinner}! Final scores - Blue: ${data.scores.blue}, Red: ${data.scores.red}` 
+            });
+          }, 5000);
+        } else {
+          toast({ title: 'Round complete!', description: winner });
+        }
       }
     };
 
@@ -279,6 +303,16 @@ export default function GamePage() {
       // Could show a loading spinner or progress indicator here
     };
 
+    const handleLobbyReturned = (data: { lobby: any; message: string; timestamp: string }) => {
+      
+      toast({ title: 'Returning to Lobby', description: data.message });
+      
+      // Small delay to ensure server state is fully updated
+      setTimeout(() => {
+        navigate(`/lobby/${code}`);
+      }, 1000);
+    };
+
     addSocketListener('chat-message', handleChatMessage);
     addSocketListener('game-ended', handleGameEnded);
     addSocketListener('round-started', handleRoundStarted);
@@ -286,6 +320,7 @@ export default function GamePage() {
     addSocketListener('player-disconnected', handlePlayerDisconnected);
     addSocketListener('team-answer-submitted', handleTeamAnswerSubmitted);
     addSocketListener('answer-processing-started', handleAnswerProcessingStarted);
+    addSocketListener('lobby-returned', handleLobbyReturned);
 
     return () => {
       removeSocketListener('chat-message', handleChatMessage);
@@ -295,6 +330,7 @@ export default function GamePage() {
       removeSocketListener('player-disconnected', handlePlayerDisconnected);
       removeSocketListener('team-answer-submitted', handleTeamAnswerSubmitted);
       removeSocketListener('answer-processing-started', handleAnswerProcessingStarted);
+      removeSocketListener('lobby-returned', handleLobbyReturned);
     };
   }, [code, navigate]);
 
@@ -431,7 +467,7 @@ export default function GamePage() {
   };
   
   const submitAnswer = async (isSteal: boolean) => {
-    if (!answer.trim()) return;
+    if (!isSteal && !answer.trim()) return;
 
     const token = localStorage.getItem('gameToken');
     if (!token || !code || !currentPlayer) return;
@@ -494,6 +530,33 @@ export default function GamePage() {
     } catch (error) {
       console.error('Failed to start next round:', error);
       toast({ title: 'Error', description: 'Failed to start next round' });
+    }
+  };
+
+  const returnToLobbyFunc = async () => {
+    if (!currentPlayer?.isHost) return;
+
+    const token = localStorage.getItem('gameToken');
+    if (!token || !code) return;
+
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/lobby/returnToLobby`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: 'Returning to lobby...', description: 'Game ended successfully.' });
+      } else {
+        toast({ title: 'Error', description: data.message || 'Failed to return to lobby' });
+      }
+    } catch (error) {
+      console.error('Failed to return to lobby:', error);
+      toast({ title: 'Error', description: 'Failed to return to lobby' });
     }
   };
 
@@ -601,15 +664,116 @@ export default function GamePage() {
                     </div>
                   </div>
                   
-                  {currentPlayer?.isHost ? (
-                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={nextRound} className="mx-auto inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-6 py-3 font-semibold shadow-lg">
-                      Next Round
-                    </motion.button>
-                  ) : (
-                    <div className="text-lg text-white/70 text-center">
-                      Waiting for host to start next round<AnimatedDots />
-                    </div>
+                  {/* Only show Next Round button if game is not complete */}
+                  {!gameComplete && (
+                    currentPlayer?.isHost ? (
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={nextRound} className="mx-auto inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-6 py-3 font-semibold shadow-lg">
+                        Next Round
+                      </motion.button>
+                    ) : (
+                      <div className="text-lg text-white/70 text-center">
+                        Waiting for host to start next round<AnimatedDots />
+                      </div>
+                    )
                   )}
+                </div>
+              )}
+              
+              {phase === "summary" && allRounds.length > 0 && (
+                <div className="space-y-6">
+                  {/* Final Scores at the top */}
+                  <div className="text-center space-y-4">
+                    <div className="text-3xl font-bold text-emerald-400">🎉 Game Complete! 🎉</div>
+                    
+                    <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+                      <div className="bg-indigo-600/20 rounded-xl p-4 border border-indigo-500/30">
+                        <div className="text-indigo-400 font-semibold mb-1">Blue Team</div>
+                        <div className="text-2xl font-bold text-white">{blueScore}</div>
+                      </div>
+                      
+                      <div className="bg-rose-600/20 rounded-xl p-4 border border-rose-500/30">
+                        <div className="text-rose-400 font-semibold mb-1">Red Team</div>
+                        <div className="text-2xl font-bold text-white">{redScore}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-xl font-bold">
+                      {blueScore > redScore ? (
+                        <span className="text-indigo-400">🏆 Blue Team Wins!</span>
+                      ) : redScore > blueScore ? (
+                        <span className="text-rose-400">🏆 Red Team Wins!</span>
+                      ) : (
+                        <span className="text-yellow-400">🤝 It's a Tie!</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Round Summary List - Condensed */}
+                  <div className="space-y-3">
+                    <div className="text-lg text-white/80 text-center font-semibold">Round Summary</div>
+                    
+                    <div className="space-y-1 max-h-80 overflow-y-auto">
+                      {allRounds.map((round, index) => (
+                        <div key={index} className="bg-slate-800/30 rounded-lg p-3 border border-white/5 text-sm">
+                          <div className="flex items-center justify-between">
+                            {/* Round info */}
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="text-white/60 font-medium">R{index + 1}</div>
+                              <div className="text-white truncate flex-1 min-w-0">{round.question}</div>
+                            </div>
+                            
+                            {/* Team results */}
+                            <div className="flex items-center gap-4 text-xs">
+                              <div className="flex items-center gap-1">
+                                <span className="text-indigo-400">B:</span>
+                                <span className="text-white">
+                                  {round.blueSteal ? 'STEAL' : (round.blueAnswer || 'No answer')}
+                                </span>
+                                <span className="text-indigo-300">(+{round.bluePointsGained || 0})</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-1">
+                                <span className="text-rose-400">R:</span>
+                                <span className="text-white">
+                                  {round.redSteal ? 'STEAL' : (round.redAnswer || 'No answer')}
+                                </span>
+                                <span className="text-rose-300">(+{round.redPointsGained || 0})</span>
+                              </div>
+                              
+                              {/* Winner */}
+                              <div className="text-xs font-semibold min-w-0">
+                                {round.winner === 'tie' ? (
+                                  <span className="text-yellow-400">🤝</span>
+                                ) : (
+                                  <span className={round.winner === 'blue' ? 'text-indigo-400' : 'text-rose-400'}>
+                                    🏆
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Return to Lobby Controls */}
+                  <div className="text-center pt-4">
+                    {currentPlayer?.isHost ? (
+                      <motion.button 
+                        whileHover={{ scale: 1.02 }} 
+                        whileTap={{ scale: 0.98 }} 
+                        onClick={returnToLobbyFunc}
+                        className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-semibold shadow-lg"
+                      >
+                        Return to Lobby
+                      </motion.button>
+                    ) : (
+                      <div className="text-white/60">
+                        Waiting for host to return to lobby<AnimatedDots />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

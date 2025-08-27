@@ -201,12 +201,32 @@ const processRoundResults = async (lobby, code) => {
         
         console.log('Answer checking complete, emitting results...');
         
-        // Emit round results to all players
-        emitRoundResults(code, {
-            round: lobby.gameState.currentRound,
-            scores: lobby.gameState.scores,
-            game: getGameStateSnapshot(lobby)
-        });
+        // Check if this was the final round
+        const totalRounds = lobby.gameState.rounds.length;
+        const isGameEnd = lobby.gameState.currentRoundNumber >= totalRounds;
+        
+        if (isGameEnd) {
+            // This was the final round - emit game end results
+            lobby.gamePhase = 'ended';
+            
+            emitRoundResults(code, {
+                round: lobby.gameState.currentRound,
+                scores: lobby.gameState.scores,
+                game: getGameStateSnapshot(lobby),
+                isGameEnd: true,
+                gameComplete: true
+            });
+            
+            console.log(`Game ended for lobby ${code}. Final scores - Blue: ${lobby.gameState.scores.blue}, Red: ${lobby.gameState.scores.red}`);
+        } else {
+            // Regular round results
+            emitRoundResults(code, {
+                round: lobby.gameState.currentRound,
+                scores: lobby.gameState.scores,
+                game: getGameStateSnapshot(lobby),
+                isGameEnd: false
+            });
+        }
         
         console.log('Round results emitted successfully');
     } catch (error) {
@@ -315,11 +335,50 @@ const checkAnswers = async (lobby) => {
 }
 
 
+export const returnToLobby = (playerId, code) => {
+    const lobby = lobbyStore.get(code);
+    if (!lobby) {
+        return { success: false, message: 'Lobby not found' };
+    }
+
+    // Only host can return to lobby
+    if (lobby.getHost().id !== playerId) {
+        return { success: false, message: 'Only host can return to lobby' };
+    }
+
+    // Reset lobby to pregame state
+    lobby.gamePhase = 'pregame';
+    lobby.gameState = {
+        rounds: [],
+        questions: [],
+        currentRoundNumber: 0,
+        scores: {
+            blue: 0,
+            red: 0,
+        },
+        currentRound: null,
+    };
+
+
+    // Get the final lobby snapshot after reset
+    const finalSnapshot = getLobbySnapshot(lobby);
+
+    // Emit lobby returned event to all players
+    emitCustomEventToLobby(code, 'lobby-returned', {
+        lobby: finalSnapshot,
+        message: 'Game ended, returned to lobby',
+        timestamp: new Date().toISOString()
+    });
+
+    return { success: true, lobby: finalSnapshot };
+};
+
 const getGameStateSnapshot = (lobby) => {
     return {
         currentRoundNumber: lobby.gameState.currentRoundNumber,
         currentRound: lobby.gameState.currentRound,
         scores: lobby.gameState.scores,
         gamePhase: lobby.gamePhase,
+        rounds: lobby.gameState.rounds,
     }    
 }

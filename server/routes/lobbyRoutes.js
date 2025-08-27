@@ -1,6 +1,6 @@
 import express from "express";
 import { createLobby, joinLobby, getLobby, leaveLobby, startGame,
-    endLobby, teamSelect, updateSettings, kickPlayer, startRound, submitAnswer } from '../controllers/lobbyController.js';
+    endLobby, teamSelect, updateSettings, kickPlayer, startRound, submitAnswer, returnToLobby } from '../controllers/lobbyController.js';
 
 const router = express.Router();
 
@@ -36,5 +36,8 @@ router.post('/startRound', startRound);
 
 // POST /api/lobby/submitAnswer
 router.post('/submitAnswer', submitAnswer);
+
+// POST /api/lobby/returnToLobby
+router.post('/returnToLobby', returnToLobby);
 
 export default router;
