@@ -157,4 +157,13 @@ export class Lobby {
     getMaxTeamSize() {
         return this.maxTeamSize;
     }
+    getTeamCaptain(team) {
+        if (team === "blue") {
+            return this.blueCaptain;
+        } else if (team === "red") {
+            return this.redCaptain;
+        } else {
+            throw new Error("Invalid team");
+        }
+    }
 }

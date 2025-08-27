@@ -318,7 +318,6 @@ export const startGame = async (playerId, code) => {
 	}
 };
 
-
 // Add player to team with less players
 const addPlayerToSmallerTeam = (player, lobby) => {
     if (lobby.getBlueTeamSize() <= lobby.getRedTeamSize()) {

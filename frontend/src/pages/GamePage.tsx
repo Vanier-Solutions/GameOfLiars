@@ -38,7 +38,25 @@ function BanditLogo(props: { className?: string }) {
   );
 }
 
-function TeamCard({ side, color, score, maxScore, players, currentPlayerId }: { side: "Blue" | "Red"; color: "blue" | "red"; score: number; maxScore: number; players: Player[]; currentPlayerId?: string; }) {
+function AnimatedDots() {
+  const [dots, setDots] = useState('.');
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots(prev => {
+        if (prev === '.') return '..';
+        if (prev === '..') return '...';
+        return '.';
+      });
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  return <span>{dots}</span>;
+}
+
+function TeamCard({ side, color, score, players, currentPlayerId }: { side: "Blue" | "Red"; color: "blue" | "red"; score: number; players: Player[]; currentPlayerId?: string; }) {
   const colorClasses = color === "blue" ? "from-indigo-500 to-blue-600" : "from-rose-600 to-red-600";
   const panelBg = color === "blue" ? "bg-indigo-50/5" : "bg-rose-50/5";
   return (
@@ -47,7 +65,6 @@ function TeamCard({ side, color, score, maxScore, players, currentPlayerId }: { 
         <span>{side} Team</span>
         <div className="text-right leading-none">
           <div className="text-xl font-extrabold">{score}</div>
-          <div className="text-xs opacity-80">/ {maxScore}</div>
         </div>
       </div>
       <div className={`${panelBg} p-3 space-y-2 hidden lg:block`}>
@@ -68,16 +85,16 @@ function TeamCard({ side, color, score, maxScore, players, currentPlayerId }: { 
   );
 }
 
-function ScorePillsMobile({ blueScore, redScore, maxScore }: { blueScore: number; redScore: number; maxScore: number; }) {
+function ScorePillsMobile({ blueScore, redScore }: { blueScore: number; redScore: number; }) {
   return (
     <div className="lg:hidden grid grid-cols-2 gap-3">
       <div className="rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-4 py-2 flex items-center justify-between shadow border border-white/10">
         <span className="font-semibold">Blue</span>
-        <span className="font-extrabold">{blueScore} / {maxScore}</span>
+        <span className="font-extrabold">{blueScore}</span>
       </div>
       <div className="rounded-xl bg-gradient-to-r from-rose-600 to-red-600 px-4 py-2 flex items-center justify-between shadow border border-white/10">
         <span className="font-semibold">Red</span>
-        <span className="font-extrabold">{redScore} / {maxScore}</span>
+        <span className="font-extrabold">{redScore}</span>
       </div>
     </div>
   );
@@ -106,7 +123,7 @@ function ChatMessage({ message, currentPlayerTeam }: { message: ChatMessage; cur
     <div className={`${messageBg} rounded-lg p-1.5 mb-1.5`}>
       <div className="flex items-center gap-2 text-sm">
         <span className={`${isTeamChat ? teamBgColors[message.team] : 'bg-white'} ${isTeamChat ? 'text-white' : teamColors[message.team]} px-2 py-0.5 rounded font-medium text-xs`}>
-          {isTeamChat ? `[TEAM] ${message.playerName}` : `[GAME] ${message.playerName}`}
+          {isTeamChat ? `[TEAM] ${message.playerName}` : `[ALL] ${message.playerName}`}
         </span>
         <span className="text-white flex-1">{message.message}</span>
         <span className="text-xs text-white/50">
@@ -121,7 +138,8 @@ export default function GamePage() {
   const { code } = useParams();
   const navigate = useNavigate();
   const [round, setRound] = useState(1);
-  const [phase, setPhase] = useState<"idle" | "question" | "answered">("idle");
+  const [phase, setPhase] = useState<"idle" | "question" | "answered" | "results">("idle");
+  const [roundResults, setRoundResults] = useState<any>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [chatMode, setChatMode] = useState<"game" | "team">("team");
@@ -130,6 +148,8 @@ export default function GamePage() {
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [blueTeam, setBlueTeam] = useState<Player[]>([]);
   const [redTeam, setRedTeam] = useState<Player[]>([]);
+  const [blueScore, setBlueScore] = useState<number>(0);
+  const [redScore, setRedScore] = useState<number>(0);
   const [maxScore, setMaxScore] = useState<number>(7);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -140,21 +160,40 @@ export default function GamePage() {
       return;
     }
 
-    // Connect to socket and join lobby
-    socketService.connect();
-    socketService.joinLobby(token);
-
-    // Get current player base info from token
+    // Verify token is valid and player is authorized to be in this game
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
+      
+      // Check if token is for the correct lobby
+      if (payload.lobby !== code) {
+        console.error('Token lobby mismatch');
+        navigate('/');
+        return;
+      }
+
+      // Check if token is expired
+      const now = Math.floor(Date.now() / 1000);
+      if (payload.exp && payload.exp < now) {
+        console.error('Token expired');
+        navigate('/');
+        return;
+      }
+
       setCurrentPlayer({
         id: payload.sub,
         name: payload.name,
-        team: "blue"
+        team: "blue",
+        isHost: payload.isHost || false
       });
     } catch (error) {
       console.error('Failed to parse token:', error);
+      navigate('/');
+      return;
     }
+
+    // Connect to socket and join lobby
+    socketService.connect();
+    socketService.joinLobby(token);
   }, [code, navigate]);
 
   useEffect(() => {
@@ -176,12 +215,86 @@ export default function GamePage() {
       navigate(`/lobby/${code}`);
     };
 
+    const handleRoundStarted = (data: { game: { currentRoundNumber: number; currentRound: { question: string; roundNumber: number }; scores: { blue: number; red: number } } }) => {
+      if (data.game && data.game.currentRound) {
+        setRound(data.game.currentRoundNumber);
+        setQuestion(data.game.currentRound.question);
+        setPhase("question");
+        setAnswer("");
+        setRoundResults(null);
+        
+        // Update scores if provided
+        if (data.game.scores) {
+          setBlueScore(data.game.scores.blue);
+          setRedScore(data.game.scores.red);
+        }
+        
+        toast({ title: 'New round started!', description: `Round ${data.game.currentRoundNumber} begins` });
+      }
+    };
+
+    const handleRoundResults = (data: { round: any; scores: { blue: number; red: number } }) => {
+      if (data.round) {
+        setRoundResults(data.round);
+        setPhase("results");
+        
+        // Update scores
+        if (data.scores) {
+          setBlueScore(data.scores.blue);
+          setRedScore(data.scores.red);
+        }
+        
+        const winner = data.round.winner === 'tie' ? 'It\'s a tie!' : `${data.round.winner} team wins this round!`;
+        toast({ title: 'Round complete!', description: winner });
+      }
+    };
+
+    const handlePlayerDisconnected = (data: { playerId: string; lobbyCode: string; timestamp: string }) => {
+      // Update UI to show player as disconnected but don't remove them
+      console.log(`Player ${data.playerId} disconnected from game`);
+      // Could add visual indicators here in the future
+    };
+
+    const handleTeamAnswerSubmitted = (data: { team: string; isSteal: boolean; bothSubmitted: boolean; timestamp: string }) => {
+      console.log(`${data.team} team submitted ${data.isSteal ? 'STEAL' : 'an answer'}`);
+      
+      if (data.bothSubmitted) {
+        // Both teams have submitted, show waiting state
+        toast({ 
+          title: 'Both teams submitted!', 
+          description: 'Checking answers...' 
+        });
+      } else {
+        // Only one team submitted, show waiting for other team
+        const otherTeam = data.team === 'blue' ? 'red' : 'blue';
+        toast({ 
+          title: `${data.team.charAt(0).toUpperCase() + data.team.slice(1)} team submitted!`, 
+          description: `Waiting for ${otherTeam} team...` 
+        });
+      }
+    };
+
+    const handleAnswerProcessingStarted = (data: { message: string; timestamp: string }) => {
+      console.log('Answer processing started:', data.message);
+      // Could show a loading spinner or progress indicator here
+    };
+
     addSocketListener('chat-message', handleChatMessage);
     addSocketListener('game-ended', handleGameEnded);
+    addSocketListener('round-started', handleRoundStarted);
+    addSocketListener('round-results', handleRoundResults);
+    addSocketListener('player-disconnected', handlePlayerDisconnected);
+    addSocketListener('team-answer-submitted', handleTeamAnswerSubmitted);
+    addSocketListener('answer-processing-started', handleAnswerProcessingStarted);
 
     return () => {
       removeSocketListener('chat-message', handleChatMessage);
       removeSocketListener('game-ended', handleGameEnded);
+      removeSocketListener('round-started', handleRoundStarted);
+      removeSocketListener('round-results', handleRoundResults);
+      removeSocketListener('player-disconnected', handlePlayerDisconnected);
+      removeSocketListener('team-answer-submitted', handleTeamAnswerSubmitted);
+      removeSocketListener('answer-processing-started', handleAnswerProcessingStarted);
     };
   }, [code, navigate]);
 
@@ -230,6 +343,17 @@ export default function GamePage() {
       setBlueTeam(lobby.blueTeam || []);
       setRedTeam(lobby.redTeam || []);
       if (lobby?.settings?.rounds) setMaxScore(Number(lobby.settings.rounds) || 7);
+      
+      // Update team scores from game state if available
+      if (lobby?.gameState?.scores) {
+        setBlueScore(lobby.gameState.scores.blue || 0);
+        setRedScore(lobby.gameState.scores.red || 0);
+      } else {
+        // Initialize scores to 0 if no game state yet
+        setBlueScore(0);
+        setRedScore(0);
+      }
+      
       setCurrentPlayer((prev) => {
         if (!prev) return prev;
         const all = [...(lobby.blueTeam || []), ...(lobby.redTeam || [])];
@@ -268,24 +392,8 @@ export default function GamePage() {
   const sendMessage = () => {
     if (!chatText.trim() || !currentPlayer) return;
 
-    const messageData = {
-      message: chatText.trim(),
-      playerId: currentPlayer.id,
-      playerName: currentPlayer.name,
-      team: currentPlayer.team,
-      chatType: chatMode,
-      timestamp: new Date().toISOString()
-    };
-
-    // Emit chat message via socket
     socketService.sendChatMessage(code!, chatText.trim(), currentPlayer.id, currentPlayer.name, currentPlayer.team, chatMode);
 
-    // Add message to local state immediately
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      ...messageData
-    };
-    setMessages(prev => [...prev, newMessage]);
     setChatText("");
   };
 
@@ -296,36 +404,101 @@ export default function GamePage() {
     }
   };
 
-  const startRound = () => {
-    setPhase("question");
-    setQuestion("In this round, think carefully: when people are asked the classic trick question 'What do cows drink?' many say milk by reflex. Write the best answer your team agrees on and decide whether to bluff or set up a steal opportunity.");
+  const startRound = async () => {
+    const token = localStorage.getItem('gameToken');
+    if (!token || !code) return;
+
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/lobby/startRound`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code })
+      });
+      
+      const data = await response.json();
+      if (!data.success) {
+        toast({ title: 'Error', description: data.message || 'Failed to start round' });
+      }
+      // Success is handled by the socket listener for 'round-started'
+      // The question and phase will be set automatically when the socket event is received
+    } catch (error) {
+      console.error('Failed to start round:', error);
+      toast({ title: 'Error', description: 'Failed to start round' });
+    }
   };
   
-  const submitAnswer = () => {
+  const submitAnswer = async (isSteal: boolean) => {
     if (!answer.trim()) return;
-    setPhase("answered");
-    alert(`Answer submitted: ${answer}`);
+
+    const token = localStorage.getItem('gameToken');
+    if (!token || !code || !currentPlayer) return;
+
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/lobby/submitAnswer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          code,
+          isSteal: isSteal,
+          answer: answer.trim(),
+          playerId: currentPlayer.id,
+          team: currentPlayer.team,
+          roundNumber: round
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setPhase("answered");
+        toast({ title: 'Answer submitted!', description: 'Your team\'s answer has been locked in.' });
+      } else {
+        toast({ title: 'Error', description: data.message || 'Failed to submit answer' });
+      }
+    } catch (error) {
+      console.error('Failed to submit answer:', error);
+      toast({ title: 'Error', description: 'Failed to submit answer' });
+    }
   };
   
-  const steal = () => {
-    if (phase !== "question") return;
-    alert("Attempting to steal! Your host logic should emit a STEAL event here.");
-  };
-  
-  const nextRound = () => {
-    setRound(prev => prev + 1);
-    setPhase("idle");
-    setQuestion("");
-    setAnswer("");
+  const nextRound = async () => {
+    // Only host can start the next round
+    if (!currentPlayer?.isHost) {
+      toast({ title: 'Error', description: 'Only the host can start the next round' });
+      return;
+    }
+
+    const token = localStorage.getItem('gameToken');
+    if (!token || !code) return;
+
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/lobby/startRound`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code })
+      });
+      
+      const data = await response.json();
+      if (!data.success) {
+        toast({ title: 'Error', description: data.message || 'Failed to start next round' });
+      }
+      // Success is handled by the socket listener for 'round-started'
+    } catch (error) {
+      console.error('Failed to start next round:', error);
+      toast({ title: 'Error', description: 'Failed to start next round' });
+    }
   };
 
-  // Show all messages (both game and team) in one view
-  const visibleMessages = messages.filter(msg => {
-    if (msg.chatType === "team") {
-      return msg.team === currentPlayer?.team; // Only show team messages from own team
-    }
-    return true; // Show all game messages
-  });
+  // Show all messages (both game and team) in one view - team messages are filtered in ChatMessage component
+  const visibleMessages = messages;
 
   return (
     <div className="min-h-screen text-white relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -343,38 +516,44 @@ export default function GamePage() {
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Game of Liars</h1>
           </div>
-          <div className="text-xs sm:text-sm text-white/70">Room: {code} • Round {round}/10</div>
+          <div className="text-xs sm:text-sm text-white/70">Room: {code} • Round {round}/{maxScore}</div>
         </div>
       </header>
 
       <main className="relative z-10 mx-auto max-w-6xl px-4 pt-6 pb-16 space-y-6">
-        <ScorePillsMobile blueScore={blueTeam.length} redScore={redTeam.length} maxScore={maxScore} />
+        <ScorePillsMobile blueScore={blueScore} redScore={redScore} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <div className="hidden lg:block lg:col-span-3 xl:col-span-2">
-            <TeamCard side="Blue" color="blue" score={blueTeam.length} maxScore={maxScore} players={blueTeam} currentPlayerId={currentPlayer?.id} />
+            <TeamCard side="Blue" color="blue" score={blueScore} players={blueTeam} currentPlayerId={currentPlayer?.id} />
           </div>
 
           <div className="lg:col-span-6 xl:col-span-8 space-y-4 order-last lg:order-none">
             <div className="rounded-3xl border border-white/10 bg-slate-900/60 backdrop-blur-xl shadow-2xl p-8 text-center min-h-[300px] flex flex-col justify-center">
               {phase === "idle" && (
                 <div className="space-y-4">
-                  <div className="text-2xl font-semibold">Round {round}</div>
-                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={startRound} className="mx-auto inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-6 py-3 font-semibold shadow-lg">
-                    <Play className="h-5 w-5"/> Start Round
-                  </motion.button>
+                  <div className="text-2xl font-semibold">Round {round} of {maxScore}</div>
+                  {currentPlayer?.isHost ? (
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={startRound} className="mx-auto inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-6 py-3 font-semibold shadow-lg">
+                      <Play className="h-5 w-5"/> Start Round
+                    </motion.button>
+                  ) : (
+                    <div className="text-lg text-white/70">
+                      Waiting for host<AnimatedDots />
+                    </div>
+                  )}
                 </div>
               )}
               {phase === "question" && (
                 <div className="space-y-5 text-left">
-                  <div className="text-lg text-white/80 text-center">Round {round}</div>
+                  <div className="text-lg text-white/80 text-center">Round {round} of {maxScore}</div>
                   <div className="text-xl sm:text-2xl font-bold text-center leading-snug max-w-3xl mx-auto">{question}</div>
                   <div className="flex items-center gap-3">
                     <input value={answer} onChange={(e)=>setAnswer(e.target.value)} placeholder="Type your team answer" className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/60" />
-                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={submitAnswer} className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3 font-semibold shadow-lg inline-flex items-center gap-2">
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={()=>submitAnswer(false)} className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3 font-semibold shadow-lg inline-flex items-center gap-2">
                       <Send className="h-4 w-4"/> Submit
                     </motion.button>
-                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={steal} className="rounded-xl bg-rose-600 hover:bg-rose-500 px-5 py-3 font-semibold shadow-lg">
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={()=>submitAnswer(true)} className="rounded-xl bg-rose-600 hover:bg-rose-500 px-5 py-3 font-semibold shadow-lg">
                       Steal
                     </motion.button>
                   </div>
@@ -384,10 +563,53 @@ export default function GamePage() {
                 <div className="space-y-3">
                   <div className="text-lg text-white/80">Answer locked</div>
                   <div className="text-2xl font-bold">{answer}</div>
-                  <div className="text-sm text-white/60">Waiting for the other team…</div>
-                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={nextRound} className="mx-auto inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-6 py-3 font-semibold shadow-lg">
-                    Next Round
-                  </motion.button>
+                  <div className="text-sm text-white/60">Waiting for the other team<AnimatedDots /></div>
+                </div>
+              )}
+              {phase === "results" && roundResults && (
+                <div className="space-y-4">
+                  <div className="text-lg text-white/80 text-center">Round {round} Results</div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-indigo-600/20 rounded-xl p-4 border border-indigo-500/30">
+                      <div className="text-indigo-400 font-semibold mb-2">Blue Team</div>
+                      <div className="text-white text-lg">{roundResults.blueSteal ? '🎯 STEAL' : roundResults.blueAnswer}</div>
+                      <div className="text-indigo-300 text-sm mt-2">+{roundResults.bluePointsGained} points</div>
+                    </div>
+                    
+                    <div className="bg-rose-600/20 rounded-xl p-4 border border-rose-500/30">
+                      <div className="text-rose-400 font-semibold mb-2">Red Team</div>
+                      <div className="text-white text-lg">{roundResults.redSteal ? '🎯 STEAL' : roundResults.redAnswer}</div>
+                      <div className="text-rose-300 text-sm mt-2">+{roundResults.redPointsGained} points</div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="text-sm text-white/60 mb-2">Correct Answer:</div>
+                    <div className="text-xl font-bold text-emerald-400">{roundResults.answer}</div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="text-lg font-semibold">
+                      {roundResults.winner === 'tie' ? (
+                        <span className="text-yellow-400">🤝 It's a tie!</span>
+                      ) : (
+                        <span className={roundResults.winner === 'blue' ? 'text-indigo-400' : 'text-rose-400'}>
+                          🏆 {roundResults.winner} team wins!
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {currentPlayer?.isHost ? (
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={nextRound} className="mx-auto inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-6 py-3 font-semibold shadow-lg">
+                      Next Round
+                    </motion.button>
+                  ) : (
+                    <div className="text-lg text-white/70 text-center">
+                      Waiting for host to start next round<AnimatedDots />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -396,7 +618,7 @@ export default function GamePage() {
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-semibold">Chat</div>
                 <div className="inline-flex rounded-lg bg-white/5 p-1 border border-white/10">
-                  <button onClick={()=>setChatMode("game")} className={`px-3 py-1 text-xs rounded-md transition-colors ${chatMode==='game'?'bg-indigo-600 text-white':'text-white/70 hover:text-white'}`}>Game</button>
+                  <button onClick={()=>setChatMode("game")} className={`px-3 py-1 text-xs rounded-md transition-colors ${chatMode==='game'?'bg-indigo-600 text-white':'text-white/70 hover:text-white'}`}>All</button>
                   <button onClick={()=>setChatMode("team")} className={`px-3 py-1 text-xs rounded-md transition-colors ${chatMode==='team'?'bg-emerald-600 text-white':'text-white/70 hover:text-white'}`}>Team</button>
                 </div>
               </div>
@@ -415,7 +637,7 @@ export default function GamePage() {
                   value={chatText} 
                   onChange={(e)=>setChatText(e.target.value)} 
                   onKeyPress={handleKeyPress}
-                  placeholder={`Type a ${chatMode} message...`} 
+                  placeholder={`Type a ${chatMode === 'game' ? 'room' : 'team'} message...`} 
                   className="flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/60 text-white" 
                 />
                 <motion.button 
@@ -432,7 +654,7 @@ export default function GamePage() {
           </div>
 
           <div className="hidden lg:block lg:col-span-3 xl:col-span-2">
-            <TeamCard side="Red" color="red" score={redTeam.length} maxScore={maxScore} players={redTeam} currentPlayerId={currentPlayer?.id} />
+            <TeamCard side="Red" color="red" score={redScore} players={redTeam} currentPlayerId={currentPlayer?.id} />
           </div>
         </div>
       </main>

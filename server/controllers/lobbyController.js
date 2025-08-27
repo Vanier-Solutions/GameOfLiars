@@ -1,4 +1,5 @@
 import * as lobbyService from '../services/lobbyService.js';
+import * as gameService from '../services/gameService.js';
 
 const getBearerToken = (req) => {
     const auth = req.headers.authorization || '';
@@ -214,6 +215,54 @@ export const updateSettings = async (req, res) => {
         return res.status(status).json(result);
     } catch (error) {
         console.error('Error updating settings:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+}
+
+export const startRound = async (req, res) => {
+    try {
+        const token = getBearerToken(req);
+        if (!token) return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const payload = lobbyService.verifyToken(token);
+        if (!payload) return res.status(401).json({ success: false, message: 'Invalid token' });
+
+        const { code } = req.body;
+        if (!code) {
+            return res.status(400).json({ success: false, message: 'Lobby code is required' });
+        }
+
+        // Verify the token's lobby matches the requested lobby
+        if (payload.lobby !== code) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this lobby' });
+        }
+
+        const result = gameService.startRound(payload.sub, code);
+        const status = result.success ? 200 : (result.message?.includes('not found') ? 404 : 400);
+        return res.status(status).json(result);
+    } catch (error) {
+        console.error('Error starting round:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+}
+
+export const submitAnswer = async (req, res) => {
+    try {
+        const token = getBearerToken(req);
+        if (!token) return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const payload = lobbyService.verifyToken(token);
+        if (!payload) return res.status(401).json({ success: false, message: 'Invalid token' });
+
+        const { code, isSteal, answer, playerId, team, roundNumber } = req.body;
+        
+        if (payload.lobby !== code) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this lobby' });
+        }
+
+        const result = await gameService.submitAnswer(payload.sub, code, isSteal, answer, team, roundNumber);
+        const status = result.success ? 200 : (result.message?.includes('not found') ? 404 : 400);
+        return res.status(status).json(result);
+    } catch (error) {
+        console.error('Error submitting answer:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 }

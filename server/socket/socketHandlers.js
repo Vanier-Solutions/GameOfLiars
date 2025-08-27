@@ -1,10 +1,13 @@
 import { verifyToken } from '../services/lobbyService.js';
 import * as lobbyService from '../services/lobbyService.js';
+import { emitPlayerDisconnected } from '../socket/socketService.js';
 
 // playerId -> Socket Connection
 const playerSockets = new Map();
 // lobbyCode -> Socket Connections
 const lobbySockets = new Map();
+// Track disconnected players during games (playerId -> timeout)
+const disconnectedPlayers = new Map();
 
 export const setupSocketHandlers = (io) => {
     // Set the io instance for use in utility functions
@@ -43,7 +46,19 @@ export const setupSocketHandlers = (io) => {
                     return;
                 }
 
-                // Store socket mappings
+                // Store socket mappings (replace existing if reconnecting)
+                const existingSocketId = playerSockets.get(playerId);
+                if (existingSocketId) {
+                    console.log(`Player ${playerId} reconnecting - replacing socket ${existingSocketId} with ${socket.id}`);
+                }
+                
+                // If player was disconnected, clear the timeout
+                if (disconnectedPlayers.has(playerId)) {
+                    clearTimeout(disconnectedPlayers.get(playerId));
+                    disconnectedPlayers.delete(playerId);
+                    console.log(`Player ${playerId} reconnected successfully`);
+                }
+                
                 playerSockets.set(playerId, socket.id);
                 
                 if (!lobbySockets.has(lobbyCode)) {
@@ -117,7 +132,39 @@ export const setupSocketHandlers = (io) => {
             const lobbyCode = socket.data.lobbyCode;
 
             if (playerId && lobbyCode) {
-                lobbyService.leaveLobby(playerId, lobbyCode);
+                // Get lobby to check game phase
+                const lobby = lobbyService.getLobbyByCode(lobbyCode);
+                
+                if (!lobby) return; // Lobby already gone
+                
+                // During a game, don't immediately remove players on disconnect
+                // Instead, mark them as disconnected and give them time to reconnect
+                if (lobby.getGamePhase() === 'playing') {
+                    console.log(`Player ${playerId} disconnected during game - not removing from lobby`);
+                    // Emit disconnected event but don't remove from lobby
+                    emitPlayerDisconnected(lobbyCode, playerId);
+                    
+                    // Set up a timeout to remove player if they don't reconnect within 2 minutes
+                    const timeout = setTimeout(() => {
+                        console.log(`Player ${playerId} failed to reconnect within timeout - removing from lobby`);
+                        disconnectedPlayers.delete(playerId);
+                        lobbyService.leaveLobby(playerId, lobbyCode);
+                    }, 120000); // 2 minutes
+                    
+                    disconnectedPlayers.set(playerId, timeout);
+                    
+                    // Clean up socket mappings but keep player in lobby
+                    playerSockets.delete(playerId);
+                    if (lobbySockets.has(lobbyCode)) {
+                        lobbySockets.get(lobbyCode).delete(socket.id);
+                        if (lobbySockets.get(lobbyCode).size === 0) {
+                            lobbySockets.delete(lobbyCode);
+                        }
+                    }
+                } else {
+                    // In pregame phase, normal disconnect behavior
+                    lobbyService.leaveLobby(playerId, lobbyCode);
+                }
             }
         });
 

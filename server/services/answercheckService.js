@@ -22,7 +22,12 @@ class AnswerCheckService {
 		try {
 			const prompt = this.buildGeminiPrompt({ correctAnswer, playerAnswer, question, acceptableAnswers });
 
-			const response = await this.ai.models.generateContent({
+			// Add timeout to prevent hanging
+			const timeoutPromise = new Promise((_, reject) => {
+				setTimeout(() => reject(new Error('Answer check timeout')), 10000); // 10 second timeout
+			});
+
+			const geminiPromise = this.ai.models.generateContent({
 				model: "gemini-2.5-flash-lite",
 				contents: prompt,
 				config: {
@@ -32,11 +37,13 @@ class AnswerCheckService {
 				}
 			});
 
+			const response = await Promise.race([geminiPromise, timeoutPromise]);
 			const generatedAnswer = response.text;
-			return this.parseGeminiResponse(generatedAnswer);
+			return this.parseGeminiResponse(generatedAnswer) === 'correct' ? true : false;
 		} catch (error) {
 			console.error('Error checking answer:', error);
-			throw error;
+			// Return false for incorrect if API fails, don't throw
+			return false;
 		}
 	}
 

@@ -150,6 +150,32 @@ export const emitGameEnded = (lobbyCode, payload) => {
 };
 
 /**
+ * Emit when a round starts so clients can update the game UI
+ * @param {string} lobbyCode
+ * @param {Object} payload - Game state including current round data
+ */
+export const emitRoundStarted = (lobbyCode, payload) => {
+    emitToLobby(lobbyCode, 'round-started', {
+        lobbyCode,
+        ...payload,
+        timestamp: new Date().toISOString()
+    });
+};
+
+/**
+ * Emit when round results are ready (both teams submitted, points calculated)
+ * @param {string} lobbyCode
+ * @param {Object} payload - Round results including answers, winner, points
+ */
+export const emitRoundResults = (lobbyCode, payload) => {
+    emitToLobby(lobbyCode, 'round-results', {
+        lobbyCode,
+        ...payload,
+        timestamp: new Date().toISOString()
+    });
+};
+
+/**
  * Emit a you were kicked event to a specific player
  * @param {string} playerId - Player ID
  * @param {string} reason - Reason for being kicked

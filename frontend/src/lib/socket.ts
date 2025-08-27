@@ -17,6 +17,10 @@ class SocketService {
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       timeout: 10000,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     this.setupEventHandlers();
@@ -128,11 +132,48 @@ class SocketService {
     this.socket.on('connect', () => {
       this.isConnected = true;
       console.log('Socket connected:', this.socket?.id);
+      
+      // If we have a token, rejoin the lobby after reconnection
+      const token = localStorage.getItem('gameToken');
+      if (token) {
+        this.joinLobby(token);
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
       this.isConnected = false;
       console.log('Socket disconnected:', reason);
+      
+      // Only show error for intentional disconnects or server issues
+      if (reason === 'io server disconnect' || reason === 'ping timeout') {
+        toast({
+          variant: 'destructive',
+          title: 'Connection Lost',
+          description: 'Attempting to reconnect...',
+        });
+      }
+    });
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      this.isConnected = true;
+      console.log('Socket reconnected after', attemptNumber, 'attempts');
+      toast({
+        title: 'Reconnected',
+        description: 'Connection restored successfully',
+      });
+    });
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('Reconnection failed:', error);
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('Failed to reconnect after maximum attempts');
+      toast({
+        variant: 'destructive',
+        title: 'Connection Failed',
+        description: 'Unable to reconnect to server. Please refresh the page.',
+      });
     });
 
     this.socket.on('connect_error', (error) => {
@@ -179,6 +220,10 @@ export interface SocketEvents {
   'chat-message': (data: { message: string; playerId: string; playerName: string; team: string; chatType: 'game' | 'team'; timestamp: string }) => void;
   'game-started': (data: { lobbyCode: string; lobby: any; timestamp: string }) => void;
   'game-ended': (data: { lobbyCode: string; reason?: string; timestamp: string }) => void;
+  'round-started': (data: { lobbyCode: string; game: { currentRoundNumber: number; currentRound: { question: string; roundNumber: number }; scores: { blue: number; red: number } }; timestamp: string }) => void;
+  'round-results': (data: { lobbyCode: string; round: any; scores: { blue: number; red: number }; game: any; timestamp: string }) => void;
+  'team-answer-submitted': (data: { team: string; isSteal: boolean; bothSubmitted: boolean; timestamp: string }) => void;
+  'answer-processing-started': (data: { message: string; timestamp: string }) => void;
 }
 
 // Helper function to add typed event listeners

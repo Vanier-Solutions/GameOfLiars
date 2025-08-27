@@ -11,9 +11,28 @@ export class Round {
         this.blueAnswer = null;
         this.redAnswer = null;
 
-        this.winner = null;
+        this.blueSubmitted = false;
+        this.redSubmitted = false;
+
+        this.winner = null; // 'blue', 'red', 'tie'
         this.bluePointsGained = 0;
         this.redPointsGained = 0;
+    }
+
+    setTeamAnswer(team, isSteal, answer) {
+        if (team === 'blue') {
+            this.blueAnswer = answer;
+            this.blueSteal = isSteal;
+            this.blueSubmitted = true;
+        } else if (team === 'red') {
+            this.redAnswer = answer;
+            this.redSteal = isSteal;
+            this.redSubmitted = true;
+        }
+    }
+
+    bothSubmitted() {
+        return this.blueSubmitted && this.redSubmitted;
     }
 
     getQuestion() {
