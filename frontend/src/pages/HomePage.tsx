@@ -225,6 +225,7 @@ export default function HomePage() {
               placeholder="Your name"
               value={deepLinkName}
               onChange={(e) => setDeepLinkName(e.target.value)}
+              className="select-text"
             />
           </div>
           <DialogFooter>
@@ -260,7 +261,7 @@ export default function HomePage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <Input value={leftName} onChange={(e) => setLeftName(e.target.value)} placeholder="Your name" className="h-12 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400" />
+                <Input value={leftName} onChange={(e) => setLeftName(e.target.value)} placeholder="Your name" className="h-12 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400 select-text" />
                 <motion.div whileHover={{ scale: canPlay ? 1.02 : 1 }} whileTap={{ scale: canPlay ? 0.98 : 1 }}>
                   <Button onClick={onPlay} disabled={!canPlay} className="h-12 gap-2 bg-emerald-600 hover:bg-emerald-600/90">
                     <PlayIcon className="h-4 w-4" />
@@ -279,8 +280,8 @@ export default function HomePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="Enter code" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400" />
-                <Input value={joinName} onChange={(e) => setJoinName(e.target.value)} placeholder="Your name" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400" />
+                <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} maxLength={4} placeholder="Enter code" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400 select-text" />
+                <Input value={joinName} onChange={(e) => setJoinName(e.target.value)} placeholder="Your name" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400 select-text" />
               </div>
               <motion.div whileHover={{ scale: canJoin ? 1.02 : 1 }} whileTap={{ scale: canJoin ? 0.98 : 1 }}>
                 <Button onClick={onJoin} disabled={!canJoin} className="h-11 w-full gap-2 bg-indigo-600 hover:bg-indigo-600/90">
