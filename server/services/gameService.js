@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import QuestionService from './questionService.js';
 import { lobbyStore, getLobbySnapshot } from './lobbyService.js';
 import { emitGameStarted, emitRoundStarted, emitRoundResults, emitCustomEventToLobby } from '../socket/socketService.js';
-import AnswerCheckService from './answerCheckService.js';
+import AnswerCheckService from './answercheckService.js';
 
 const answerCheckService = new AnswerCheckService();
 

@@ -6,7 +6,6 @@ import { toast } from "@/components/ui/use-toast"
 import { motion } from "framer-motion"
 import { Users, Trophy, Swords, Play as PlayIcon, DoorOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getBaseUrl } from "@/lib/api"
@@ -220,12 +219,14 @@ export default function HomePage() {
             <DialogDescription>Enter your name to join lobby {deepLinkCode}.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <Input
+            <input
               autoFocus
               placeholder="Your name"
               value={deepLinkName}
               onChange={(e) => setDeepLinkName(e.target.value)}
-              className="select-text"
+              maxLength={32}
+              className="h-10 w-full rounded-md border border-white/10 bg-slate-900/60 px-3 py-2 text-base text-white placeholder:text-slate-400 shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              style={{ userSelect: 'text', pointerEvents: 'auto' }}
             />
           </div>
           <DialogFooter>
@@ -261,7 +262,14 @@ export default function HomePage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <Input value={leftName} onChange={(e) => setLeftName(e.target.value)} placeholder="Your name" className="h-12 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400 select-text" />
+                <input
+                  value={leftName}
+                  onChange={(e) => setLeftName(e.target.value)}
+                  placeholder="Your name"
+                  maxLength={32}
+                  className="h-12 w-full rounded-md border border-white/10 bg-slate-900/60 px-3 py-2 text-base text-white placeholder:text-slate-400 shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  style={{ userSelect: 'text', pointerEvents: 'auto' }}
+                />
                 <motion.div whileHover={{ scale: canPlay ? 1.02 : 1 }} whileTap={{ scale: canPlay ? 0.98 : 1 }}>
                   <Button onClick={onPlay} disabled={!canPlay} className="h-12 gap-2 bg-emerald-600 hover:bg-emerald-600/90">
                     <PlayIcon className="h-4 w-4" />
@@ -280,8 +288,22 @@ export default function HomePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} maxLength={4} placeholder="Enter code" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400 select-text" />
-                <Input value={joinName} onChange={(e) => setJoinName(e.target.value)} placeholder="Your name" className="h-11 bg-slate-900/60 border-white/10 text-white placeholder:text-slate-400 select-text" />
+                <input
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  maxLength={4}
+                  placeholder="Enter code"
+                  className="h-11 w-full rounded-md border border-white/10 bg-slate-900/60 px-3 py-2 text-base text-white placeholder:text-slate-400 shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  style={{ userSelect: 'text', pointerEvents: 'auto' }}
+                />
+                <input
+                  value={joinName}
+                  onChange={(e) => setJoinName(e.target.value)}
+                  maxLength={32}
+                  placeholder="Your name"
+                  className="h-11 w-full rounded-md border border-white/10 bg-slate-900/60 px-3 py-2 text-base text-white placeholder:text-slate-400 shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  style={{ userSelect: 'text', pointerEvents: 'auto' }}
+                />
               </div>
               <motion.div whileHover={{ scale: canJoin ? 1.02 : 1 }} whileTap={{ scale: canJoin ? 0.98 : 1 }}>
                 <Button onClick={onJoin} disabled={!canJoin} className="h-11 w-full gap-2 bg-indigo-600 hover:bg-indigo-600/90">
