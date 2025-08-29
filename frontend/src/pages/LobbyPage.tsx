@@ -198,13 +198,13 @@ export default function LobbyPage() {
       // Handle settings updated
       addSocketListener('settings-updated', (data) => {
         const { lobby } = data;
-                 if (lobby.settings) {
-           setGameSettings({
-             rounds: lobby.settings.rounds || 7,
-             roundLimit: 60,
-             tags: ["General"]
-           });
-         }
+        if (lobby.settings) {
+          setGameSettings({
+            rounds: lobby.settings.rounds || 7,
+            roundLimit: lobby.settings.roundLimit || 60,
+            tags: lobby.settings.tags || ["General"]
+          });
+        }
       })
 
       // Handle game started -> navigate to game page

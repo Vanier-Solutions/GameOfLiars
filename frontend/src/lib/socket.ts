@@ -13,6 +13,8 @@ interface LobbyData {
   redTeam: Player[]
   settings?: {
     rounds?: number
+    roundLimit?: number
+    tags?: string[]
   }
   gameState?: {
     scores?: {
