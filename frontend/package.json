@@ -41,7 +41,6 @@
     "framer-motion": "^12.23.12",
     "frontend": "file:",
     "lucide-react": "^0.536.0",
-    "next-themes": "^0.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.1",
