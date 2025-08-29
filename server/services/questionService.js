@@ -10,6 +10,8 @@ class QuestionService {
         try {
             const prompt = this.buildGeminiPrompt(rounds, tags);
 
+            const tools = {}
+
             const response = await this.ai.models.generateContent({
                 model: "gemini-2.5-flash-lite",
                 contents: prompt,
