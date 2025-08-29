@@ -120,7 +120,7 @@ export default function LobbyPage() {
     const setupSocketListeners = () => {
       // Handle player joined
       addSocketListener('player-joined', (data) => {
-        const { player, lobby } = data
+        const { lobby } = data
         setBlueTeam(lobby.blueTeam)
         setRedTeam(lobby.redTeam)
         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
@@ -129,7 +129,7 @@ export default function LobbyPage() {
 
       // Handle player left
       addSocketListener('player-left', (data) => {
-        const { player, lobby } = data
+        const { lobby } = data
         setBlueTeam(lobby.blueTeam)
         setRedTeam(lobby.redTeam)
         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
@@ -157,13 +157,13 @@ export default function LobbyPage() {
       })
 
       // Handle lobby ended
-      addSocketListener('lobby-ended', (data) => {
+      addSocketListener('lobby-ended', () => {
         localStorage.removeItem('gameToken')
         navigate('/')
       })
 
       // Handle when current player gets kicked
-      addSocketListener('you-were-kicked', (data) => {
+      addSocketListener('you-were-kicked', () => {
         // You were kicked
         localStorage.removeItem('gameToken')
         navigate('/')
@@ -179,7 +179,7 @@ export default function LobbyPage() {
 
       // Handle player team changed
       addSocketListener('player-team-changed', (data) => {
-        const { player, lobby } = data
+        const { lobby } = data
         setBlueTeam(lobby.blueTeam)
         setRedTeam(lobby.redTeam)
         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))

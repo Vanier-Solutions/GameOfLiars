@@ -301,7 +301,7 @@ export default function GamePage() {
         }
 
         setPhase("results")
-        const winner = data.round.winner === "tie" ? "It's a tie!" : `${data.round.winner} team wins this round!`
+        // Round winner determined
 
         if (data.gameComplete && data.game) {
           setGameComplete(true)
@@ -309,9 +309,7 @@ export default function GamePage() {
 
           setTimeout(() => {
             setPhase("summary")
-
-            const finalWinner =
-              data.scores.blue > data.scores.red ? "Blue" : data.scores.red > data.scores.blue ? "Red" : "Tie"
+            // Game complete, showing summary
           }, 5000)
         } else {
           // Round complete
@@ -332,7 +330,7 @@ export default function GamePage() {
       if (data.bothSubmitted) {
         // Both teams have submitted, show waiting state
       } else {
-        const otherTeam = data.team === "blue" ? "red" : "blue"
+        // Team answer submitted
       }
     }
 
@@ -496,8 +494,8 @@ export default function GamePage() {
         body: JSON.stringify({ code }),
       })
 
-      const data = await response.json()
-      if (!data.success) {
+      const responseData = await response.json()
+      if (!responseData.success) {
         // Failed to start round;
       }
     } catch (error) {
@@ -529,8 +527,8 @@ export default function GamePage() {
         }),
       })
 
-      const data = await response.json()
-      if (data.success) {
+      const responseData = await response.json()
+      if (responseData.success) {
         setPhase("answered")
         // Answer submitted;
       } else {
@@ -561,8 +559,8 @@ export default function GamePage() {
         body: JSON.stringify({ code }),
       })
 
-      const data = await response.json()
-      if (!data.success) {
+      const responseData = await response.json()
+      if (!responseData.success) {
         // Failed to start next round;
       }
     } catch (error) {
@@ -586,8 +584,8 @@ export default function GamePage() {
         },
       })
 
-      const data = await response.json()
-      if (data.success) {
+      const responseData = await response.json()
+      if (responseData.success) {
         // Returning to lobby;
       } else {
         // Failed to return to lobby;

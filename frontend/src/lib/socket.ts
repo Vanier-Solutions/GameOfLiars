@@ -150,7 +150,7 @@ class SocketService {
       }
     });
 
-    this.socket.on('reconnect', (attemptNumber) => {
+    this.socket.on('reconnect', () => {
       this.isConnected = true;
 
       // Reconnected
