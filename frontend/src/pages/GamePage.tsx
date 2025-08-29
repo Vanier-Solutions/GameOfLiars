@@ -154,6 +154,8 @@ export default function GamePage() {
   const [redScore, setRedScore] = useState<number>(0);
   const [maxScore, setMaxScore] = useState<number>(7);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const timerIntervalRef = useRef<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number>(0);
 
   useEffect(() => {
     const token = localStorage.getItem('gameToken');
@@ -216,7 +218,7 @@ export default function GamePage() {
       navigate(`/lobby/${code}`);
     };
 
-    const handleRoundStarted = (data: { game: { currentRoundNumber: number; currentRound: { question: string; roundNumber: number }; scores: { blue: number; red: number } } }) => {
+    const handleRoundStarted = (data: any) => {
       if (data.game && data.game.currentRound) {
         setRound(data.game.currentRoundNumber);
         setQuestion(data.game.currentRound.question);
@@ -230,10 +232,40 @@ export default function GamePage() {
           setRedScore(data.game.scores.red);
         }
         
-        // New round started
+        // Clear any existing timer before starting a new one
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
+
+        // Simple countdown timer using server-provided endsAt
+        const updateTimer = () => {
+          const now = Date.now();
+          const timeLeft = Math.max(0, (data.endsAt ?? 0) - now);
+          const secondsLeftCalc = Math.floor(timeLeft / 1000);
+          
+          setSecondsLeft(secondsLeftCalc);
+
+          
+          if (timeLeft <= 0) {
+            clearInterval(timerIntervalRef.current!);
+            timerIntervalRef.current = null;
+          }
+        };
+        
+        // Update immediately and then every second
+        updateTimer();
+        timerIntervalRef.current = window.setInterval(updateTimer, 1000);
       }
     };
 
+    const handleRoundTimeup = () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setSecondsLeft(0);
+    };
     const handleRoundResults = (data: { round: any; scores: { blue: number; red: number }; game?: any; isGameEnd?: boolean; gameComplete?: boolean }) => {
       if (data.round) {
         setRoundResults(data.round);
@@ -303,6 +335,7 @@ export default function GamePage() {
     addSocketListener('game-ended', handleGameEnded);
     addSocketListener('round-started', handleRoundStarted);
     addSocketListener('round-results', handleRoundResults);
+    addSocketListener('round-timeup', handleRoundTimeup as any);
     addSocketListener('player-disconnected', handlePlayerDisconnected);
     addSocketListener('team-answer-submitted', handleTeamAnswerSubmitted);
     addSocketListener('answer-processing-started', handleAnswerProcessingStarted);
@@ -313,6 +346,11 @@ export default function GamePage() {
       removeSocketListener('game-ended', handleGameEnded);
       removeSocketListener('round-started', handleRoundStarted);
       removeSocketListener('round-results', handleRoundResults);
+      removeSocketListener('round-timeup', handleRoundTimeup as any);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
       removeSocketListener('player-disconnected', handlePlayerDisconnected);
       removeSocketListener('team-answer-submitted', handleTeamAnswerSubmitted);
       removeSocketListener('answer-processing-started', handleAnswerProcessingStarted);
@@ -596,6 +634,7 @@ export default function GamePage() {
               {phase === "question" && (
                 <div className="space-y-5 text-left">
                   <div className="text-lg text-white/80 text-center">Round {round} of {maxScore}</div>
+                  <div className="text-md text-white/60 text-center">Time left: {secondsLeft}s</div>
                   <div className="text-xl sm:text-2xl font-bold text-center leading-snug max-w-3xl mx-auto">{question}</div>
                   <div className="flex items-center gap-3">
                     <input value={answer} onChange={(e)=>setAnswer(e.target.value)} placeholder="Type your team answer" className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/60" />
@@ -710,21 +749,21 @@ export default function GamePage() {
                             
                             {/* Team results */}
                             <div className="flex items-center gap-4 text-xs">
-                              <div className="flex items-center gap-1">
-                                <span className="text-indigo-400">B:</span>
-                                <span className="text-white">
-                                  {round.blueSteal ? 'STEAL' : (round.blueAnswer || 'No answer')}
-                                </span>
-                                <span className="text-indigo-300">(+{round.bluePointsGained || 0})</span>
-                              </div>
-                              
-                              <div className="flex items-center gap-1">
-                                <span className="text-rose-400">R:</span>
-                                <span className="text-white">
-                                  {round.redSteal ? 'STEAL' : (round.redAnswer || 'No answer')}
-                                </span>
-                                <span className="text-rose-300">(+{round.redPointsGained || 0})</span>
-                              </div>
+                                                             <div className="flex items-center gap-1">
+                                 <span className="text-indigo-400">B:</span>
+                                 <span className="text-white">
+                                   {round.blueSteal ? 'STEAL' : (round.blueAnswer || 'No Answer Submitted')}
+                                 </span>
+                                 <span className="text-indigo-300">(+{round.bluePointsGained || 0})</span>
+                               </div>
+                               
+                               <div className="flex items-center gap-1">
+                                 <span className="text-rose-400">R:</span>
+                                 <span className="text-white">
+                                   {round.redSteal ? 'STEAL' : (round.redAnswer || 'No Answer Submitted')}
+                                 </span>
+                                 <span className="text-rose-300">(+{round.redPointsGained || 0})</span>
+                               </div>
                               
                               {/* Winner */}
                               <div className="text-xs font-semibold min-w-0">

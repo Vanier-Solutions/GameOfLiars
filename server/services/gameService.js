@@ -94,8 +94,13 @@ export const startRound = (playerId, code) => {
         return { success: false, message: 'No rounds available' };
     }
 
+    const serverNow = Date.now();
+    const { roundLimit } = lobby.getSettings();
+    const durationMs = (Number(roundLimit) || 30) * 1000; 
+    const endsAt = serverNow + durationMs;
+
     const snapshot = getGameStateSnapshot(lobby);
-    emitRoundStarted(code, { game: snapshot });
+    emitRoundStarted(code, { game: snapshot, serverNow, endsAt, durationMs });
     
 	return { 
 		success: true,

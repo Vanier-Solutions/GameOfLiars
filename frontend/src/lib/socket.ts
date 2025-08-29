@@ -201,7 +201,8 @@ export interface SocketEvents {
   'chat-message': (data: { message: string; playerId: string; playerName: string; team: string; chatType: 'game' | 'team'; timestamp: string }) => void;
   'game-started': (data: { lobbyCode: string; lobby: any; timestamp: string }) => void;
   'game-ended': (data: { lobbyCode: string; reason?: string; timestamp: string }) => void;
-  'round-started': (data: { lobbyCode: string; game: { currentRoundNumber: number; currentRound: { question: string; roundNumber: number }; scores: { blue: number; red: number } }; timestamp: string }) => void;
+  'round-started': (data: { lobbyCode: string; game: { currentRoundNumber: number; currentRound: { question: string; roundNumber: number }; scores: { blue: number; red: number } }; serverNow: number; endsAt: number; durationMs: number; timestamp: string }) => void;
+  'round-timeup': (data: { endsAt: number }) => void;
   'round-results': (data: { lobbyCode: string; round: any; scores: { blue: number; red: number }; game: any; timestamp: string }) => void;
   'team-answer-submitted': (data: { team: string; isSteal: boolean; bothSubmitted: boolean; timestamp: string }) => void;
   'answer-processing-started': (data: { message: string; timestamp: string }) => void;
