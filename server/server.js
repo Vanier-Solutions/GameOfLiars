@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import connectDB from './config/db.js';
 import lobbyRoutes from './routes/lobbyRoutes.js';
+import 'dotenv/config';
 import { setupSocketHandlers } from './socket/socketHandlers.js';
 
 const PORT = process.env.PORT || 5051;
