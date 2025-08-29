@@ -51,7 +51,7 @@ export default function HomePage() {
       localStorage.setItem("gameToken", data.token)
       localStorage.setItem("lobbyCode", data.lobby.code)
       navigate(`/lobby/${data.lobby.code}`)
-    } catch (err: any) {
+    } catch {
       // Error creating lobby - could add error handling here if needed
     }
   }
@@ -70,7 +70,7 @@ export default function HomePage() {
       localStorage.setItem("gameToken", data.token)
       localStorage.setItem("lobbyCode", data.lobby.code)
       navigate(`/lobby/${data.lobby.code}`)
-    } catch (err: any) {
+    } catch {
       // Error joining lobby - could add error handling here if needed
     }
   }
@@ -90,7 +90,7 @@ export default function HomePage() {
       localStorage.setItem("lobbyCode", data.lobby.code)
       setDeepLinkOpen(false)
       navigate(`/lobby/${data.lobby.code}`)
-    } catch (err: any) {
+    } catch {
       // Error joining lobby - could add error handling here if needed
     }
   }
@@ -116,7 +116,7 @@ export default function HomePage() {
           } else {
             // Lobby doesn't exist - could add error handling here if needed
           }
-        } catch (err) {
+        } catch {
           // Network error - could add error handling here if needed
         }
       }
@@ -154,7 +154,7 @@ export default function HomePage() {
     disabled,
     badge,
   }: {
-    icon: any
+    icon: React.ComponentType<{ className?: string }>
     title: string
     subtitle: string
     disabled?: boolean

@@ -28,6 +28,57 @@ interface Player {
   isHost?: boolean
 }
 
+interface RoundResult {
+  question: string
+  blueSteal: boolean
+  blueAnswer: string
+  bluePointsGained: number
+  redSteal: boolean
+  redAnswer: string
+  redPointsGained: number
+  answer: string
+  winner: "blue" | "red" | "tie"
+}
+
+interface GameRound {
+  question: string
+  blueSteal: boolean
+  blueAnswer: string
+  bluePointsGained: number
+  redSteal: boolean
+  redAnswer: string
+  redPointsGained: number
+  answer: string
+  winner: "blue" | "red" | "tie"
+}
+
+interface LobbyData {
+  blueTeam: Player[]
+  redTeam: Player[]
+  settings?: {
+    rounds?: number
+  }
+  gameState?: {
+    scores?: {
+      blue: number
+      red: number
+    }
+  }
+}
+
+interface GameData {
+  currentRoundNumber: number
+  currentRound: {
+    question: string
+  }
+  scores?: {
+    blue: number
+    red: number
+  }
+  rounds?: GameRound[]
+  endsAt?: number
+}
+
 function GameIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
@@ -158,9 +209,9 @@ export default function GamePage() {
   const navigate = useNavigate()
   const [round, setRound] = useState(1)
   const [phase, setPhase] = useState<"idle" | "question" | "answered" | "results" | "summary">("idle")
-  const [roundResults, setRoundResults] = useState<any>(null)
+  const [roundResults, setRoundResults] = useState<RoundResult | null>(null)
   const [gameComplete, setGameComplete] = useState(false)
-  const [allRounds, setAllRounds] = useState<any[]>([])
+  const [allRounds, setAllRounds] = useState<GameRound[]>([])
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
   const [chatMode, setChatMode] = useState<"game" | "team">("team")
@@ -238,11 +289,11 @@ export default function GamePage() {
       setMessages((prev) => [...prev, newMessage])
     }
 
-    const handleGameEnded = (data: { reason?: string }) => {
+    const handleGameEnded = () => {
       navigate(`/lobby/${code}`)
     }
 
-    const handleRoundStarted = (data: any) => {
+    const handleRoundStarted = (data: { game: GameData; endsAt?: number }) => {
       if (data.game && data.game.currentRound) {
         setRound(data.game.currentRoundNumber)
         setQuestion(data.game.currentRound.question)
@@ -267,8 +318,10 @@ export default function GamePage() {
           setSecondsLeft(secondsLeftCalc)
 
           if (timeLeft <= 0) {
-            clearInterval(timerIntervalRef.current!)
-            timerIntervalRef.current = null
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current)
+              timerIntervalRef.current = null
+            }
           }
         }
 
@@ -286,9 +339,9 @@ export default function GamePage() {
     }
 
     const handleRoundResults = (data: {
-      round: any
+      round: RoundResult
       scores: { blue: number; red: number }
-      game?: any
+      game?: { rounds?: GameRound[] }
       isGameEnd?: boolean
       gameComplete?: boolean
     }) => {
@@ -317,7 +370,7 @@ export default function GamePage() {
       }
     }
 
-    const handlePlayerDisconnected = (data: { playerId: string; lobbyCode: string; timestamp: string }) => {
+    const handlePlayerDisconnected = () => {
       // Update UI to show player as disconnected but don't remove them
     }
 
@@ -334,11 +387,11 @@ export default function GamePage() {
       }
     }
 
-    const handleAnswerProcessingStarted = (data: { message: string; timestamp: string }) => {
+    const handleAnswerProcessingStarted = () => {
       // Could show a loading spinner or progress indicator here
     }
 
-    const handleLobbyReturned = (data: { lobby: any; message: string; timestamp: string }) => {
+    const handleLobbyReturned = () => {
       setTimeout(() => {
         navigate(`/lobby/${code}`)
       }, 1000)
@@ -348,7 +401,7 @@ export default function GamePage() {
     addSocketListener("game-ended", handleGameEnded)
     addSocketListener("round-started", handleRoundStarted)
     addSocketListener("round-results", handleRoundResults)
-    addSocketListener("round-timeup", handleRoundTimeup as any)
+    addSocketListener("round-timeup", handleRoundTimeup)
     addSocketListener("player-disconnected", handlePlayerDisconnected)
     addSocketListener("team-answer-submitted", handleTeamAnswerSubmitted)
     addSocketListener("answer-processing-started", handleAnswerProcessingStarted)
@@ -359,7 +412,7 @@ export default function GamePage() {
       removeSocketListener("game-ended", handleGameEnded)
       removeSocketListener("round-started", handleRoundStarted)
       removeSocketListener("round-results", handleRoundResults)
-      removeSocketListener("round-timeup", handleRoundTimeup as any)
+      removeSocketListener("round-timeup", handleRoundTimeup)
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current)
         timerIntervalRef.current = null
@@ -409,7 +462,7 @@ export default function GamePage() {
   }, [messages])
 
   useEffect(() => {
-    const syncFromLobby = (lobby: any) => {
+    const syncFromLobby = (lobby: LobbyData) => {
       if (!lobby) return
       setBlueTeam(lobby.blueTeam || [])
       setRedTeam(lobby.redTeam || [])
@@ -426,35 +479,35 @@ export default function GamePage() {
       setCurrentPlayer((prev) => {
         if (!prev) return prev
         const all = [...(lobby.blueTeam || []), ...(lobby.redTeam || [])]
-        const me = all.find((p: any) => p.id === prev.id)
+        const me = all.find((p: Player) => p.id === prev.id)
         return me ? { ...prev, team: me.team } : prev
       })
     }
 
-    const onPlayerJoined = (data: any) => syncFromLobby(data.lobby)
-    const onPlayerLeft = (data: any) => syncFromLobby(data.lobby)
-    const onTeamChanged = (data: any) => syncFromLobby(data.lobby)
-    const onPlayerKicked = (data: any) => syncFromLobby(data.lobby)
-    const onLobbyUpdated = (data: any) => syncFromLobby(data.lobby)
-    const onSettingsUpdated = (data: any) => syncFromLobby(data.lobby)
-    const onGameStarted = (data: any) => syncFromLobby(data.lobby)
+    const onPlayerJoined = (data: { lobby: LobbyData }) => syncFromLobby(data.lobby)
+    const onPlayerLeft = (data: { lobby: LobbyData }) => syncFromLobby(data.lobby)
+    const onTeamChanged = (data: { lobby: LobbyData }) => syncFromLobby(data.lobby)
+    const onPlayerKicked = (data: { lobby: LobbyData }) => syncFromLobby(data.lobby)
+    const onLobbyUpdated = (data: { lobby: LobbyData }) => syncFromLobby(data.lobby)
+    const onSettingsUpdated = (data: { lobby: LobbyData }) => syncFromLobby(data.lobby)
+    const onGameStarted = (data: { lobby: LobbyData }) => syncFromLobby(data.lobby)
 
-    addSocketListener("player-joined", onPlayerJoined as any)
-    addSocketListener("player-left", onPlayerLeft as any)
-    addSocketListener("player-team-changed", onTeamChanged as any)
-    addSocketListener("player-kicked", onPlayerKicked as any)
-    addSocketListener("lobby-updated", onLobbyUpdated as any)
-    addSocketListener("settings-updated", onSettingsUpdated as any)
-    addSocketListener("game-started", onGameStarted as any)
+    addSocketListener("player-joined", onPlayerJoined)
+    addSocketListener("player-left", onPlayerLeft)
+    addSocketListener("player-team-changed", onTeamChanged)
+    addSocketListener("player-kicked", onPlayerKicked)
+    addSocketListener("lobby-updated", onLobbyUpdated)
+    addSocketListener("settings-updated", onSettingsUpdated)
+    addSocketListener("game-started", onGameStarted)
 
     return () => {
-      removeSocketListener("player-joined", onPlayerJoined as any)
-      removeSocketListener("player-left", onPlayerLeft as any)
-      removeSocketListener("player-team-changed", onTeamChanged as any)
-      removeSocketListener("player-kicked", onPlayerKicked as any)
-      removeSocketListener("lobby-updated", onLobbyUpdated as any)
-      removeSocketListener("settings-updated", onSettingsUpdated as any)
-      removeSocketListener("game-started", onGameStarted as any)
+      removeSocketListener("player-joined", onPlayerJoined)
+      removeSocketListener("player-left", onPlayerLeft)
+      removeSocketListener("player-team-changed", onTeamChanged)
+      removeSocketListener("player-kicked", onPlayerKicked)
+      removeSocketListener("lobby-updated", onLobbyUpdated)
+      removeSocketListener("settings-updated", onSettingsUpdated)
+      removeSocketListener("game-started", onGameStarted)
     }
   }, [])
 

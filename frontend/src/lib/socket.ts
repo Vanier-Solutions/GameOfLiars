@@ -1,5 +1,54 @@
 import { io, Socket } from 'socket.io-client';
 
+interface Player {
+  id: string
+  name: string
+  team: "blue" | "red"
+  isCaptain?: boolean
+  isHost?: boolean
+}
+
+interface LobbyData {
+  blueTeam: Player[]
+  redTeam: Player[]
+  settings?: {
+    rounds?: number
+  }
+  gameState?: {
+    scores?: {
+      blue: number
+      red: number
+    }
+  }
+  captains?: {
+    blue?: Player
+    red?: Player
+  }
+}
+
+interface GameData {
+  currentRoundNumber: number
+  currentRound: {
+    question: string
+    roundNumber: number
+  }
+  scores: {
+    blue: number
+    red: number
+  }
+}
+
+interface RoundData {
+  question: string
+  blueSteal: boolean
+  blueAnswer: string
+  bluePointsGained: number
+  redSteal: boolean
+  redAnswer: string
+  redPointsGained: number
+  answer: string
+  winner: "blue" | "red" | "tie"
+}
 
 class SocketService {
   private socket: Socket | null = null;
@@ -75,7 +124,7 @@ class SocketService {
   }
 
   // Emit lobby updated event
-  emitLobbyUpdated(lobbyCode: string, updateData: any) {
+  emitLobbyUpdated(lobbyCode: string, updateData: Record<string, unknown>) {
     if (!this.socket) {
       console.error('Socket not connected. Call connect() first.');
       return;
@@ -95,7 +144,7 @@ class SocketService {
     this.eventListeners.get(event)!.push(callback);
 
     if (this.socket) {
-      this.socket.on(event, callback as any);
+      this.socket.on(event, callback as (...args: unknown[]) => void);
     }
   }
 
@@ -110,7 +159,7 @@ class SocketService {
         }
       }
       if (this.socket) {
-        this.socket.off(event, callback as any);
+        this.socket.off(event, callback as (...args: unknown[]) => void);
       }
     } else {
       this.eventListeners.delete(event);
@@ -178,7 +227,7 @@ class SocketService {
     // Re-attach all existing event listeners when socket reconnects
     this.eventListeners.forEach((callbacks, event) => {
       callbacks.forEach(callback => {
-        this.socket!.on(event, callback as any);
+        this.socket!.on(event, callback as (...args: unknown[]) => void);
       });
     });
   }
@@ -189,24 +238,24 @@ export const socketService = new SocketService();
 
 // Event type definitions for better TypeScript support
 export interface SocketEvents {
-  'player-joined': (data: { player: any; lobby: any; timestamp: string }) => void;
-  'player-left': (data: { player: any; lobby: any; timestamp: string }) => void;
+  'player-joined': (data: { player: Player; lobby: LobbyData; timestamp: string }) => void;
+  'player-left': (data: { player: Player; lobby: LobbyData; timestamp: string }) => void;
   'player-disconnected': (data: { playerId: string; lobbyCode: string; timestamp: string }) => void;
-  'player-team-changed': (data: { player: any; lobby: any; timestamp: string }) => void;
-  'player-kicked': (data: { player: any; kickedBy: string; lobby: any; timestamp: string }) => void;
+  'player-team-changed': (data: { player: Player; lobby: LobbyData; timestamp: string }) => void;
+  'player-kicked': (data: { player: Player; kickedBy: string; lobby: LobbyData; timestamp: string }) => void;
   'you-were-kicked': (data: { reason: string; kickedBy: string; timestamp: string }) => void;
-  'lobby-updated': (data: { lobby: any; updateType: string; timestamp: string }) => void;
+  'lobby-updated': (data: { lobby: LobbyData; updateType: string; timestamp: string }) => void;
   'lobby-ended': (data: { reason: string; timestamp: string }) => void;
-  'settings-updated': (data: { lobby: any; timestamp: string }) => void;
+  'settings-updated': (data: { lobby: LobbyData; timestamp: string }) => void;
   'chat-message': (data: { message: string; playerId: string; playerName: string; team: string; chatType: 'game' | 'team'; timestamp: string }) => void;
-  'game-started': (data: { lobbyCode: string; lobby: any; timestamp: string }) => void;
+  'game-started': (data: { lobbyCode: string; lobby: LobbyData; timestamp: string }) => void;
   'game-ended': (data: { lobbyCode: string; reason?: string; timestamp: string }) => void;
-  'round-started': (data: { lobbyCode: string; game: { currentRoundNumber: number; currentRound: { question: string; roundNumber: number }; scores: { blue: number; red: number } }; serverNow: number; endsAt: number; durationMs: number; timestamp: string }) => void;
+  'round-started': (data: { lobbyCode: string; game: GameData; serverNow: number; endsAt: number; durationMs: number; timestamp: string }) => void;
   'round-timeup': (data: { endsAt: number }) => void;
-  'round-results': (data: { lobbyCode: string; round: any; scores: { blue: number; red: number }; game: any; timestamp: string }) => void;
+  'round-results': (data: { lobbyCode: string; round: RoundData; scores: { blue: number; red: number }; game: { rounds?: RoundData[] }; timestamp: string }) => void;
   'team-answer-submitted': (data: { team: string; isSteal: boolean; bothSubmitted: boolean; timestamp: string }) => void;
   'answer-processing-started': (data: { message: string; timestamp: string }) => void;
-  'lobby-returned': (data: { lobby: any; message: string; timestamp: string }) => void;
+  'lobby-returned': (data: { lobby: LobbyData; message: string; timestamp: string }) => void;
 }
 
 // Helper function to add typed event listeners

@@ -58,7 +58,9 @@ export default function LobbyPage() {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]))
         setIsHost(Boolean(payload?.isHost))
-      } catch {}
+      } catch {
+        console.error("Failed to parse token:", token);
+      }
     } else {
       setIsHost(false)
     }
@@ -91,11 +93,12 @@ export default function LobbyPage() {
         // Connect to socket and join lobby
         socketService.connect()
         socketService.joinLobby(token)
-      } catch (err: any) {
-        // Network or other errors - redirect home
-        localStorage.removeItem("gameToken")
-        navigate("/")
-      }
+             } catch (error) {
+         // Network or other errors - redirect home
+         console.error("Failed to fetch lobby:", error);
+         localStorage.removeItem("gameToken")
+         navigate("/")
+       }
     }
     if (gameCode) fetchLobby()
   }, [gameCode, navigate])
@@ -144,10 +147,16 @@ export default function LobbyPage() {
       // Handle lobby updates
       addSocketListener('lobby-updated', (data) => {
         const { lobby, updateType } = data
-        setBlueTeam(lobby.blueTeam)
-        setRedTeam(lobby.redTeam)
-        setGameSettings(lobby.settings)
-        setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
+                 setBlueTeam(lobby.blueTeam)
+         setRedTeam(lobby.redTeam)
+         if (lobby.settings) {
+           setGameSettings({
+             rounds: lobby.settings.rounds || 7,
+             roundLimit: 60,
+             tags: ["General"]
+           });
+         }
+         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
         
         if (updateType === 'team-change') {
           // Teams updated
@@ -189,7 +198,13 @@ export default function LobbyPage() {
       // Handle settings updated
       addSocketListener('settings-updated', (data) => {
         const { lobby } = data;
-        setGameSettings(lobby.settings);
+                 if (lobby.settings) {
+           setGameSettings({
+             rounds: lobby.settings.rounds || 7,
+             roundLimit: 60,
+             tags: ["General"]
+           });
+         }
       })
 
       // Handle game started -> navigate to game page
@@ -328,7 +343,7 @@ export default function LobbyPage() {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to start game')
       // Game started
       // Optionally navigate to game screen later
-    } catch (e: any) {
+    } catch {
       // Start failed
     }
   }
@@ -345,7 +360,7 @@ export default function LobbyPage() {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to end lobby')
       localStorage.removeItem('gameToken')
       navigate('/')
-    } catch (e: any) {
+    } catch {
       // End lobby failed
     }
   }
@@ -362,7 +377,7 @@ export default function LobbyPage() {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to leave lobby')
       localStorage.removeItem('gameToken')
       navigate('/')
-    } catch (e: any) {
+    } catch {
       // Leave failed
     }
   }
@@ -393,7 +408,7 @@ export default function LobbyPage() {
         setHasCaptains(Boolean(data.lobby.captains?.blue && data.lobby.captains?.red))
         
       }
-    } catch (e: any) {
+    } catch {
       // Team join failed
     }
   }
@@ -417,7 +432,7 @@ export default function LobbyPage() {
         throw new Error(data.message || 'Failed to update settings');
       }
       // Settings updated;
-    } catch (e: any) {
+    } catch {
       // Update settings failed;
     }
   }
@@ -439,7 +454,7 @@ export default function LobbyPage() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to kick player');
       // Player kicked;
-    } catch (e: any) {
+    } catch {
       // Kick player failed;
     }
   }
