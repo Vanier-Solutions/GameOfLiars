@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { toast } from "@/components/ui/use-toast"
+
 import { motion } from "framer-motion"
 import { Users, Trophy, Swords, Play as PlayIcon, DoorOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -61,7 +61,7 @@ export default function HomePage() {
       localStorage.setItem("lobbyCode", data.lobby.code)
       navigate(`/lobby/${data.lobby.code}`)
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Error creating lobby" })
+      // Error creating lobby - could add error handling here if needed
     }
   }
 
@@ -80,7 +80,7 @@ export default function HomePage() {
       localStorage.setItem("lobbyCode", data.lobby.code)
       navigate(`/lobby/${data.lobby.code}`)
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Error joining lobby" })
+      // Error joining lobby - could add error handling here if needed
     }
   }
 
@@ -100,7 +100,7 @@ export default function HomePage() {
       setDeepLinkOpen(false)
       navigate(`/lobby/${data.lobby.code}`)
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message || "Error joining lobby" })
+      // Error joining lobby - could add error handling here if needed
     }
   }
 
@@ -123,20 +123,10 @@ export default function HomePage() {
             setDeepLinkCode(lobbyCode.toUpperCase())
             setDeepLinkOpen(true)
           } else {
-            // Lobby doesn't exist - show error
-            toast({ 
-              variant: "destructive", 
-              title: "Lobby not found", 
-              description: `Lobby ${lobbyCode.toUpperCase()} does not exist or has ended.` 
-            })
+            // Lobby doesn't exist - could add error handling here if needed
           }
         } catch (err) {
-          // Network error - show generic error
-          toast({ 
-            variant: "destructive", 
-            title: "Connection error", 
-            description: "Could not connect to server. Please try again." 
-          })
+          // Network error - could add error handling here if needed
         }
       }
       
@@ -189,7 +179,7 @@ export default function HomePage() {
         whileHover={disabled ? undefined : { y: -2 }}
         whileTap={disabled ? undefined : { y: 0 }}
         className={
-          `flex h-24 items-center gap-3 rounded-2xl border border-white/10 p-4 text-left ` +
+          `flex h-24 items-center gap-3 rounded-2xl border border-white/10 p-4 text-left cursor-pointer ` +
           (disabled ? "bg-slate-800/40 opacity-60 select-none" : "bg-slate-800/60")
         }
       >
@@ -246,7 +236,7 @@ export default function HomePage() {
             <BanditLogo className="h-8 w-8" />
             <span className="text-xl font-semibold tracking-wide text-white">Game of Liars</span>
           </div>
-          <div className="text-sm text-slate-300/80">v0.1 • Let the bluffing begin ✨</div>
+          <div className="text-sm text-slate-300/80">v0.2 • VS Devs </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -273,12 +263,12 @@ export default function HomePage() {
                 <motion.div whileHover={{ scale: canPlay ? 1.02 : 1 }} whileTap={{ scale: canPlay ? 0.98 : 1 }}>
                   <Button onClick={onPlay} disabled={!canPlay} className="h-12 gap-2 bg-emerald-600 hover:bg-emerald-600/90">
                     <PlayIcon className="h-4 w-4" />
-                    Play
+                    Host
                   </Button>
                 </motion.div>
               </div>
 
-              <div className="text-sm text-slate-300/70">Tournament and Duels are being built! For now, host a <span className="font-semibold text-white">Teams</span> room.</div>
+              <div className="text-sm text-slate-300/70"><span className="font-semibold text-emerald-400">AI-powered</span> questions and answer checking make every game unique and fair. Create custom categories for endless fun!</div>
             </CardContent>
           </Card>
 
@@ -334,8 +324,7 @@ export default function HomePage() {
               </li>
               <li><span className="font-semibold">Bluff boldly.</span> Sometimes the best move is to sound confident with the wrong answer so the other team tries (and fails) to steal.</li>
             </ol>
-            <div className="text-sm text-slate-300/80">Tip: "What do cows drink?" — Most people say milk. It’s actually <span className="italic">water</span>.</div>
-          </CardContent>
+            </CardContent>
         </Card>
       </div>
     </div>

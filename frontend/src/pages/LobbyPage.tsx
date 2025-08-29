@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { toast } from "@/components/ui/use-toast"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -113,10 +113,7 @@ export default function LobbyPage() {
         setBlueTeam(lobby.blueTeam)
         setRedTeam(lobby.redTeam)
         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
-        toast({
-          title: 'Player Joined',
-          description: `${player.name} joined the lobby`,
-        })
+        // Player joined
       })
 
       // Handle player left
@@ -125,19 +122,12 @@ export default function LobbyPage() {
         setBlueTeam(lobby.blueTeam)
         setRedTeam(lobby.redTeam)
         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
-        toast({
-          title: 'Player Left',
-          description: `${player.name} left the lobby`,
-        })
+        // Player left
       })
 
       // Handle player disconnected
       addSocketListener('player-disconnected', () => {
-        toast({
-          variant: 'destructive',
-          title: 'Player Disconnected',
-          description: `A player disconnected from the lobby`,
-        })
+        // Player disconnected
       })
 
       // Handle lobby updates
@@ -149,36 +139,21 @@ export default function LobbyPage() {
         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
         
         if (updateType === 'team-change') {
-          toast({
-            title: 'Teams Updated',
-            description: 'A player changed teams',
-          })
+          // Teams updated
         } else if (updateType === 'settings') {
-          toast({
-            title: 'Settings Updated',
-            description: 'Game settings have been changed',
-          })
+          // Settings updated
         }
       })
 
       // Handle lobby ended
       addSocketListener('lobby-ended', (data) => {
-        toast({
-          variant: 'destructive',
-          title: 'Lobby Ended',
-          description: data.reason || 'The lobby has been ended',
-        })
         localStorage.removeItem('gameToken')
         navigate('/')
       })
 
       // Handle when current player gets kicked
-      addSocketListener('you-were-kicked', (_data) => {
-        toast({
-          variant: 'destructive',
-          title: 'You were kicked',
-          description: 'You have been kicked from the lobby',
-        })
+      addSocketListener('you-were-kicked', (data) => {
+        // You were kicked
         localStorage.removeItem('gameToken')
         navigate('/')
       })
@@ -188,11 +163,7 @@ export default function LobbyPage() {
         setBlueTeam(data.lobby.blueTeam)
         setRedTeam(data.lobby.redTeam)
         setHasCaptains(Boolean(data.lobby.captains?.blue && data.lobby.captains?.red))
-        toast({
-          variant: 'destructive',
-          title: 'Player Kicked',
-          description: `${data.player.name} was kicked from the lobby`,
-        })
+        // Player kicked
       })
 
       // Handle player team changed
@@ -201,10 +172,7 @@ export default function LobbyPage() {
         setBlueTeam(lobby.blueTeam)
         setRedTeam(lobby.redTeam)
         setHasCaptains(Boolean(lobby.captains?.blue && lobby.captains?.red))
-        toast({
-          title: 'Team Updated',
-          description: `${player.name} joined the ${player.team} team${player.isCaptain ? ' as captain' : ''}`,
-        })
+        // Team updated
       })
 
       // Handle settings updated
@@ -347,10 +315,10 @@ export default function LobbyPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to start game')
-      toast({ title: 'Game started' })
+      // Game started
       // Optionally navigate to game screen later
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Start failed', description: e.message })
+      // Start failed
     }
   }
 
@@ -367,7 +335,7 @@ export default function LobbyPage() {
       localStorage.removeItem('gameToken')
       navigate('/')
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'End lobby failed', description: e.message })
+      // End lobby failed
     }
   }
 
@@ -384,7 +352,7 @@ export default function LobbyPage() {
       localStorage.removeItem('gameToken')
       navigate('/')
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Leave failed', description: e.message })
+      // Leave failed
     }
   }
 
@@ -405,10 +373,7 @@ export default function LobbyPage() {
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to join team')
       
-      toast({ 
-        title: `Joined ${team} team${isCaptain ? ' as captain' : ''}!`,
-        description: 'Your team selection has been updated.'
-      })
+      // Team joined
       
       // Update local state with new lobby data
       if (data.lobby) {
@@ -418,11 +383,7 @@ export default function LobbyPage() {
         
       }
     } catch (e: any) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Team join failed', 
-        description: e.message 
-      })
+      // Team join failed
     }
   }
 
@@ -444,9 +405,9 @@ export default function LobbyPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Failed to update settings');
       }
-      toast({ title: 'Settings updated' });
+      // Settings updated;
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Update settings failed', description: e.message });
+      // Update settings failed;
     }
   }
 
@@ -466,9 +427,9 @@ export default function LobbyPage() {
 
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to kick player');
-      toast({ title: 'Player kicked' });
+      // Player kicked;
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Kick player failed', description: e.message });
+      // Kick player failed;
     }
   }
 

@@ -35,8 +35,6 @@ setupSocketHandlers(io);
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
-    console.log(`Server is accessible on your local network at:`);
-    console.log(`- Local: http://localhost:${PORT}`);
-    console.log(`- Network: http://[YOUR_LOCAL_IP]:${PORT}`);
+    console.log(`Server is accessible on your local network:`);
     console.log(`Socket.IO server is ready for real-time connections`);
 });

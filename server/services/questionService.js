@@ -30,7 +30,11 @@ class QuestionService {
 
     buildGeminiPrompt(rounds, tags) {
         const tags_csv = tags.join(',');
-        return `You are writing short-answer trivia for a two-team bluffing game.
+        return `You are a meticulous trivia author creating questions for a two-team bluffing game.
+
+ABSOLUTE PRIORITY
+- Your highest priority is FACTUAL ACCURACY. Every answer must be verifiably correct according to well-established, public sources as of the current year.
+- Do not generate a question if you are not 100% certain of the answer. It is better to fail than to provide incorrect information.
 
 GOAL
 - Produce EXACTLY ${rounds} questions based on these themes: ${tags_csv}.
@@ -38,10 +42,10 @@ GOAL
 - Players type one short answer (no choices).
 
 QUESTION REQUIREMENTS
-- One unambiguous factual answer per question.
+- One verifiably correct and unambiguous factual answer per question.
 - Prefer "specific but familiar" facts within a tag (e.g., well-known records, origins, nicknames, distances, rule numbers, iconic landmarks/works/figures).
 - Avoid trivia where the answer is directly telegraphed by the question wording.
-- Prefer timeless/slow-changing facts over recent news.
+- Prefer timeless/slow-changing facts over recent news or statistics that change yearly.
 - Answers should be concise (≤3 words) or a simple number/year.
 - CRITICAL: The answer must directly match what the question is asking for (e.g., if question asks for "decade", answer must be a decade like "1960s", not a century like "7th Century BC").
 
@@ -58,9 +62,11 @@ Each item has EXACTLY these keys:
   - "answer": single canonical correct answer (string) - MUST match the question format
   - "acceptable_answers": array of common synonyms/variants (can be empty)
 
-SELF-CHECK (do silently; output only the final JSON)
-- For each item, ensure: (a) not a starter fact, (b) plausible wrong-but-reasonable alternatives exist within the same tag, (c) answer is not trivially revealed by the prompt, (d) answer format matches what the question asks for.
-- If any item fails, replace it before returning the set.`;
+SELF-CHECK (do this silently; output only the final JSON)
+- Before outputting, for each generated item, critically evaluate:
+  - 1. **Factual Verification:** Is the answer absolutely, verifiably correct? If there is any ambiguity, recent change, or uncertainty, discard and replace this question.
+  - 2. **Quality Check:** Is it a "starter fact"? Do plausible wrong-but-reasonable alternatives exist? Is the answer revealed by the prompt? Does the answer format match the question?
+- If any item fails these checks, replace it before returning the final set.`;
     }
 
     parseGeminiResponse(response, rounds, tags) {

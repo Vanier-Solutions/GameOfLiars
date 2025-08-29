@@ -121,3 +121,105 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Pointer cursor for all clickable elements */
+@layer utilities {
+  /* Buttons and interactive elements */
+  button,
+  [role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  select,
+  .clickable {
+    cursor: pointer !important;
+  }
+  
+  /* Links and anchors */
+  a,
+  [role="link"] {
+    cursor: pointer !important;
+  }
+  
+  /* Elements with click handlers */
+  [onclick],
+  [data-clickable="true"] {
+    cursor: pointer !important;
+  }
+  
+  /* Motion/animated buttons (Framer Motion) */
+  motion-button,
+  .motion-button {
+    cursor: pointer !important;
+  }
+  
+  /* Any element with hover effects (usually clickable) */
+  [class*="hover:"] {
+    cursor: pointer !important;
+  }
+  
+  /* Framer Motion elements with hover animations */
+  [style*="whileHover"],
+  [data-framer-motion] {
+    cursor: pointer !important;
+  }
+  
+  /* Game mode cards and similar interactive elements */
+  .GamemodeCard,
+  [class*="GamemodeCard"],
+  .game-mode-card,
+  [class*="cursor-pointer"] {
+    cursor: pointer !important;
+  }
+  
+  /* Any element with motion animations should be clickable */
+  [style*="whileHover"],
+  [style*="whileTap"],
+  [style*="scale"],
+  [style*="y:"] {
+    cursor: pointer !important;
+  }
+  
+  /* Additional interactive elements */
+  [role="button"],
+  [tabindex],
+  [data-interactive="true"] {
+    cursor: pointer !important;
+  }
+  
+  /* Common interactive classes */
+  .cursor-pointer {
+    cursor: pointer !important;
+  }
+  
+  /* Radix UI components */
+  [data-radix-collection-item],
+  [role="menuitem"],
+  [role="option"],
+  [role="tab"],
+  [role="tabpanel"],
+  [role="dialog"],
+  [data-state] {
+    cursor: pointer !important;
+  }
+  
+  /* Disabled elements should not have pointer cursor */
+  button:disabled,
+  [disabled],
+  .disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: not-allowed !important;
+  }
+  
+  /* Text inputs should keep text cursor */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  textarea {
+    cursor: text !important;
+  }
+}

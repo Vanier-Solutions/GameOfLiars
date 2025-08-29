@@ -5,7 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Play, Send, Users } from "lucide-react";
 import { socketService, addSocketListener, removeSocketListener } from "@/lib/socket";
-import { toast } from "@/components/ui/use-toast";
+
 import { getBaseUrl } from "@/lib/api";
 
 interface ChatMessage {
@@ -213,7 +213,6 @@ export default function GamePage() {
     };
 
     const handleGameEnded = (data: { reason?: string }) => {
-      toast({ title: 'Game ended', description: data?.reason || 'Returning to lobby' });
       navigate(`/lobby/${code}`);
     };
 
@@ -231,7 +230,7 @@ export default function GamePage() {
           setRedScore(data.game.scores.red);
         }
         
-        toast({ title: 'New round started!', description: `Round ${data.game.currentRoundNumber} begins` });
+        // New round started
       }
     };
 
@@ -255,57 +254,44 @@ export default function GamePage() {
           setAllRounds(data.game.rounds || []);
           
           // Show final round results first, then transition after 5 seconds to summary
-          toast({ title: 'Final Round Complete!', description: winner });
+          // Final round complete
           
           setTimeout(() => {
             setPhase("summary");
             
             const finalWinner = data.scores.blue > data.scores.red ? 'Blue' : 
                                data.scores.red > data.scores.blue ? 'Red' : 'Tie';
-            toast({ 
-              title: 'Game Complete!', 
-              description: `Final winner: ${finalWinner}! Final scores - Blue: ${data.scores.blue}, Red: ${data.scores.red}` 
-            });
+            // Game complete
           }, 5000);
         } else {
-          toast({ title: 'Round complete!', description: winner });
+          // Round complete
         }
       }
     };
 
     const handlePlayerDisconnected = (data: { playerId: string; lobbyCode: string; timestamp: string }) => {
       // Update UI to show player as disconnected but don't remove them
-      console.log(`Player ${data.playerId} disconnected from game`);
+
       // Could add visual indicators here in the future
     };
 
     const handleTeamAnswerSubmitted = (data: { team: string; isSteal: boolean; bothSubmitted: boolean; timestamp: string }) => {
-      console.log(`${data.team} team submitted ${data.isSteal ? 'STEAL' : 'an answer'}`);
+
       
       if (data.bothSubmitted) {
         // Both teams have submitted, show waiting state
-        toast({ 
-          title: 'Both teams submitted!', 
-          description: 'Checking answers...' 
-        });
+        // Both teams submitted
       } else {
         // Only one team submitted, show waiting for other team
         const otherTeam = data.team === 'blue' ? 'red' : 'blue';
-        toast({ 
-          title: `${data.team.charAt(0).toUpperCase() + data.team.slice(1)} team submitted!`, 
-          description: `Waiting for ${otherTeam} team...` 
-        });
       }
     };
 
     const handleAnswerProcessingStarted = (data: { message: string; timestamp: string }) => {
-      console.log('Answer processing started:', data.message);
       // Could show a loading spinner or progress indicator here
     };
 
     const handleLobbyReturned = (data: { lobby: any; message: string; timestamp: string }) => {
-      
-      toast({ title: 'Returning to Lobby', description: data.message });
       
       // Small delay to ensure server state is fully updated
       setTimeout(() => {
@@ -456,13 +442,13 @@ export default function GamePage() {
       
       const data = await response.json();
       if (!data.success) {
-        toast({ title: 'Error', description: data.message || 'Failed to start round' });
+        // Failed to start round;
       }
       // Success is handled by the socket listener for 'round-started'
       // The question and phase will be set automatically when the socket event is received
     } catch (error) {
       console.error('Failed to start round:', error);
-      toast({ title: 'Error', description: 'Failed to start round' });
+      // Failed to start round;
     }
   };
   
@@ -492,20 +478,20 @@ export default function GamePage() {
       const data = await response.json();
       if (data.success) {
         setPhase("answered");
-        toast({ title: 'Answer submitted!', description: 'Your team\'s answer has been locked in.' });
+        // Answer submitted;
       } else {
-        toast({ title: 'Error', description: data.message || 'Failed to submit answer' });
+        // Failed to submit answer;
       }
     } catch (error) {
       console.error('Failed to submit answer:', error);
-      toast({ title: 'Error', description: 'Failed to submit answer' });
+      // Failed to submit answer;
     }
   };
   
   const nextRound = async () => {
     // Only host can start the next round
     if (!currentPlayer?.isHost) {
-      toast({ title: 'Error', description: 'Only the host can start the next round' });
+      // Only host can start next round;
       return;
     }
 
@@ -524,12 +510,12 @@ export default function GamePage() {
       
       const data = await response.json();
       if (!data.success) {
-        toast({ title: 'Error', description: data.message || 'Failed to start next round' });
+        // Failed to start next round;
       }
       // Success is handled by the socket listener for 'round-started'
     } catch (error) {
       console.error('Failed to start next round:', error);
-      toast({ title: 'Error', description: 'Failed to start next round' });
+      // Failed to start next round;
     }
   };
 
@@ -550,13 +536,13 @@ export default function GamePage() {
       
       const data = await response.json();
       if (data.success) {
-        toast({ title: 'Returning to lobby...', description: 'Game ended successfully.' });
+        // Returning to lobby;
       } else {
-        toast({ title: 'Error', description: data.message || 'Failed to return to lobby' });
+        // Failed to return to lobby;
       }
     } catch (error) {
       console.error('Failed to return to lobby:', error);
-      toast({ title: 'Error', description: 'Failed to return to lobby' });
+      // Failed to return to lobby;
     }
   };
 

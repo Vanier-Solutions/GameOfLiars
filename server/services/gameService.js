@@ -42,11 +42,11 @@ export const startGame = async (lobby) => {
                         i + 1
                     );
                     lobby.gameState.rounds.push(round);
-                    console.log(questionData);
+
                 }
             }
             
-            console.log(`Game started for lobby ${lobby.code} with ${lobby.gameState.rounds.length} rounds`);
+
         } catch (err) {
             console.error('Failed to generate questions:', err);
             lobby.gameState.questions = [];
@@ -105,11 +105,11 @@ export const startRound = (playerId, code) => {
 };
 
 export const submitAnswer = async (playerId, code, isSteal, answer, team, roundNumber) => {
-    console.log(`Submit answer request: playerId=${playerId}, code=${code}, isSteal=${isSteal}, answer="${answer}", team=${team}, roundNumber=${roundNumber}`);
+
     
     // Validate required parameters
     if (!playerId || !code || isSteal === undefined || (!answer && !isSteal) || !team || !roundNumber) {
-        console.log('Missing required parameters:', { playerId, code, isSteal, answer, team, roundNumber });
+
         return { success: false, message: 'Missing required parameters' };
     }
     
@@ -135,15 +135,14 @@ export const submitAnswer = async (playerId, code, isSteal, answer, team, roundN
     }
     
     const teamCaptain = lobby.getTeamCaptain(team);
-    console.log(`Team captain for ${team}:`, teamCaptain ? { id: teamCaptain.id, name: teamCaptain.getName() } : null);
-    console.log(`Player attempting submission:`, { id: playerId, name: player.getName() });
+
     
     if (!teamCaptain) {
-        console.log(`No captain assigned for ${team} team`);
+
         return { success: false, message: 'No captain assigned for your team' };
     }
     if (teamCaptain.id !== playerId) {
-        console.log(`Captain validation failed: expected ${teamCaptain.id}, got ${playerId}`);
+
         return { success: false, message: 'You are not the captain of your team' };
     }
     
@@ -158,7 +157,7 @@ export const submitAnswer = async (playerId, code, isSteal, answer, team, roundN
 
     try {
         lobby.gameState.currentRound.setTeamAnswer(team, isSteal, answer);
-        console.log(`${team} team submitted: ${isSteal ? 'STEAL' : answer}`);
+
         
         // Emit immediate feedback that team has submitted
         emitCustomEventToLobby(code, 'team-answer-submitted', {
@@ -170,7 +169,7 @@ export const submitAnswer = async (playerId, code, isSteal, answer, team, roundN
         
         // If both teams have submitted, process answers asynchronously
         if (lobby.gameState.currentRound.bothSubmitted()) {
-            console.log('Both teams submitted, processing answers...');
+
             
             // Emit that processing has started
             emitCustomEventToLobby(code, 'answer-processing-started', {
@@ -193,13 +192,13 @@ export const submitAnswer = async (playerId, code, isSteal, answer, team, roundN
 
 const processRoundResults = async (lobby, code) => {
     try {
-        console.log('Starting answer checking process...');
+
         await checkAnswers(lobby);
         
         lobby.gameState.scores.blue += lobby.gameState.currentRound.bluePointsGained;
         lobby.gameState.scores.red += lobby.gameState.currentRound.redPointsGained;
         
-        console.log('Answer checking complete, emitting results...');
+
         
         // Check if this was the final round
         const totalRounds = lobby.gameState.rounds.length;
@@ -217,7 +216,7 @@ const processRoundResults = async (lobby, code) => {
                 gameComplete: true
             });
             
-            console.log(`Game ended for lobby ${code}. Final scores - Blue: ${lobby.gameState.scores.blue}, Red: ${lobby.gameState.scores.red}`);
+
         } else {
             // Regular round results
             emitRoundResults(code, {
@@ -228,7 +227,7 @@ const processRoundResults = async (lobby, code) => {
             });
         }
         
-        console.log('Round results emitted successfully');
+
     } catch (error) {
         console.error('Error in processRoundResults:', error);
         // Even if answer checking fails, emit basic results

@@ -48,15 +48,12 @@ export const setupSocketHandlers = (io) => {
 
                 // Store socket mappings (replace existing if reconnecting)
                 const existingSocketId = playerSockets.get(playerId);
-                if (existingSocketId) {
-                    console.log(`Player ${playerId} reconnecting - replacing socket ${existingSocketId} with ${socket.id}`);
-                }
                 
                 // If player was disconnected, clear the timeout
                 if (disconnectedPlayers.has(playerId)) {
                     clearTimeout(disconnectedPlayers.get(playerId));
                     disconnectedPlayers.delete(playerId);
-                    console.log(`Player ${playerId} reconnected successfully`);
+
                 }
                 
                 playerSockets.set(playerId, socket.id);
@@ -73,7 +70,7 @@ export const setupSocketHandlers = (io) => {
                 socket.data.playerId = playerId;
                 socket.data.lobbyCode = lobbyCode;
 
-                console.log(`Player ${playerId} joined lobby ${lobbyCode}`);
+
                 
 
             } catch (error) {
@@ -117,7 +114,7 @@ export const setupSocketHandlers = (io) => {
                 socket.data.playerId = null;
                 socket.data.lobbyCode = null;
 
-                console.log(`Player ${playerId} left lobby ${lobbyCode}`);
+
                 
 
             } catch (error) {
@@ -138,14 +135,14 @@ export const setupSocketHandlers = (io) => {
                 if (!lobby) return; // Lobby already gone
                 
                 // Allow a grace period to reconnect in all phases (pre-game and playing)
-                console.log(`Player ${playerId} disconnected - allowing grace period before removal`);
+
 
                 // Emit disconnected event but don't remove from lobby yet
                 emitPlayerDisconnected(lobbyCode, playerId);
 
                 // Set up a timeout to remove player if they don't reconnect within 2 minutes
                 const timeout = setTimeout(() => {
-                    console.log(`Player ${playerId} failed to reconnect within timeout - removing from lobby`);
+
                     disconnectedPlayers.delete(playerId);
                     lobbyService.leaveLobby(playerId, lobbyCode);
                 }, 10000); // 10 seconds

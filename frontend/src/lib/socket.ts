@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { toast } from '@/components/ui/use-toast';
+
 
 class SocketService {
   private socket: Socket | null = null;
@@ -131,7 +131,7 @@ class SocketService {
 
     this.socket.on('connect', () => {
       this.isConnected = true;
-      console.log('Socket connected:', this.socket?.id);
+
       
       // If we have a token, rejoin the lobby after reconnection
       const token = localStorage.getItem('gameToken');
@@ -142,25 +142,18 @@ class SocketService {
 
     this.socket.on('disconnect', (reason) => {
       this.isConnected = false;
-      console.log('Socket disconnected:', reason);
+
       
       // Only show error for intentional disconnects or server issues
       if (reason === 'io server disconnect' || reason === 'ping timeout') {
-        toast({
-          variant: 'destructive',
-          title: 'Connection Lost',
-          description: 'Attempting to reconnect...',
-        });
+        // Connection lost
       }
     });
 
     this.socket.on('reconnect', (attemptNumber) => {
       this.isConnected = true;
-      console.log('Socket reconnected after', attemptNumber, 'attempts');
-      toast({
-        title: 'Reconnected',
-        description: 'Connection restored successfully',
-      });
+
+      // Reconnected
     });
 
     this.socket.on('reconnect_error', (error) => {
@@ -169,29 +162,17 @@ class SocketService {
 
     this.socket.on('reconnect_failed', () => {
       console.error('Failed to reconnect after maximum attempts');
-      toast({
-        variant: 'destructive',
-        title: 'Connection Failed',
-        description: 'Unable to reconnect to server. Please refresh the page.',
-      });
+      // Connection failed
     });
 
     this.socket.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Connection Error',
-        description: 'Failed to connect to the server. Please check your internet connection.',
-      });
+      // Connection error
     });
 
     this.socket.on('error', (error) => {
       console.error('Socket error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Socket Error',
-        description: error.message || 'An unexpected error occurred.',
-      });
+      // Socket error
     });
 
     // Re-attach all existing event listeners when socket reconnects
