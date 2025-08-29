@@ -14,7 +14,6 @@ export const setupSocketHandlers = (io) => {
     setIoInstance(io);
     
     io.on('connection', (socket) => {
-        console.log(`New socket connection: ${socket.id}`);
 
         // Handle player joining a lobby
         socket.on('join-lobby', async (data) => {

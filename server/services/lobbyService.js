@@ -218,6 +218,9 @@ export const leaveLobby = (playerId, code) => {
         // Emit lobby ended event
         emitLobbyEnded(code, 'Host left the lobby');
         
+        // Clean up any active round timers
+        gameService.cleanupLobbyTimers(code);
+        
         lobbyStore.delete(code);
         return { success: true, lobbyEnded: true };
     }
@@ -242,6 +245,9 @@ export const endLobby = (playerId, code) => {
     }
 
     emitLobbyEnded(code, 'Host ended the lobby');
+
+    // Clean up any active round timers
+    gameService.cleanupLobbyTimers(code);
 
     // Remove player->lobby mappings
     for (const p of lobby.getAllPlayers()) {

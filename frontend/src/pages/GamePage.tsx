@@ -26,16 +26,15 @@ interface Player {
   isHost?: boolean;
 }
 
-function BanditLogo(props: { className?: string }) {
+function GameIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className={props.className}>
-      <rect x="8" y="18" width="48" height="28" rx="14" fill="currentColor" opacity="0.9"/>
-      <rect x="14" y="26" width="14" height="8" rx="4" fill="#0f172a"/>
-      <rect x="36" y="26" width="14" height="8" rx="4" fill="#0f172a"/>
-      <path d="M12 18c4-6 12-10 20-10s16 4 20 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
-      <path d="M14 46c4 6 12 10 18 10s14-4 18-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.8"/>
+    <svg viewBox="0 0 32 32" className={className} aria-hidden>
+      <circle cx="16" cy="16" r="15" fill="#1f2937" stroke="#374151" strokeWidth="2"/>
+      <rect x="8" y="10" width="8" height="12" rx="1" fill="#3b82f6" stroke="#1e40af" strokeWidth="1"/>
+      <rect x="16" y="10" width="8" height="12" rx="1" fill="#ef4444" stroke="#dc2626" strokeWidth="1"/>
+      <text x="16" y="20" textAnchor="middle" fill="white" fontFamily="Arial, sans-serif" fontSize="10" fontWeight="bold">?</text>
     </svg>
-  );
+  )
 }
 
 function AnimatedDots() {
@@ -156,6 +155,68 @@ export default function GamePage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerIntervalRef = useRef<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
+  const confettiCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [showConfetti, setShowConfetti] = useState<boolean>(false);
+
+  const triggerConfetti = () => {
+    try {
+      setShowConfetti(true);
+      const canvas = confettiCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const resize = () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      };
+      resize();
+      const onResize = () => resize();
+      window.addEventListener('resize', onResize);
+
+      const colors = ['#FFD166', '#06D6A0', '#EF476F', '#118AB2', '#8338EC'];
+      const particles = Array.from({ length: 180 }).map(() => ({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * canvas.height * 0.3,
+        size: 5 + Math.random() * 7,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        angle: Math.random() * Math.PI * 2,
+        velocityX: (Math.random() - 0.5) * 4,
+        velocityY: 2 + Math.random() * 4,
+        spin: (Math.random() - 0.5) * 0.2,
+      }));
+
+      let rafId = 0;
+      const start = performance.now();
+      const animate = (now: number) => {
+        const elapsed = now - start;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach((p) => {
+          p.x += p.velocityX;
+          p.y += p.velocityY;
+          p.velocityY += 0.05;
+          p.angle += p.spin;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.angle);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          ctx.restore();
+        });
+        if (elapsed < 2500) {
+          rafId = requestAnimationFrame(animate);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          setShowConfetti(false);
+          cancelAnimationFrame(rafId);
+          window.removeEventListener('resize', onResize);
+        }
+      };
+
+      rafId = requestAnimationFrame(animate);
+    } catch (e) {
+      // Fail silently; confetti is cosmetic
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('gameToken');
@@ -284,6 +345,8 @@ export default function GamePage() {
         if (data.gameComplete && data.game) {
           setGameComplete(true);
           setAllRounds(data.game.rounds || []);
+          // Trigger confetti animation once on game completion
+          triggerConfetti();
           
           // Show final round results first, then transition after 5 seconds to summary
           // Final round complete
@@ -589,6 +652,12 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen text-white relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {showConfetti && (
+        <canvas
+          ref={confettiCanvasRef}
+          className="pointer-events-none fixed inset-0 z-50"
+        />
+      )}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-600/20 blur-3xl" />
         <div className="absolute top-1/3 -right-24 h-80 w-80 rounded-full bg-blue-500/20 blur-3xl" />
@@ -596,26 +665,24 @@ export default function GamePage() {
       </div>
 
       <header className="relative z-10 border-b border-white/10 bg-slate-950/40 backdrop-blur-md">
-        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
+        <div className="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 grid place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 shadow-lg text-slate-950">
-              <BanditLogo className="h-5 w-5" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Game of Liars</h1>
+            <GameIcon className="h-9 w-9" />
+            <span className="text-xl font-semibold tracking-wide text-white">Game of Liars</span>
           </div>
           <div className="text-xs sm:text-sm text-white/70">Room: {code} • Round {round}/{maxScore}</div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-6xl px-4 pt-6 pb-16 space-y-6">
+      <main className="relative z-10 mx-auto max-w-none px-6 pt-6 pb-16 space-y-6">
         <ScorePillsMobile blueScore={blueScore} redScore={redScore} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="hidden lg:block lg:col-span-3 xl:col-span-2">
+          <div className="hidden lg:block lg:col-span-3 xl:col-span-3 2xl:col-span-3">
             <TeamCard side="Blue" color="blue" score={blueScore} players={blueTeam} currentPlayerId={currentPlayer?.id} />
           </div>
 
-          <div className="lg:col-span-6 xl:col-span-8 space-y-4 order-last lg:order-none">
+          <div className="lg:col-span-6 xl:col-span-6 2xl:col-span-6 space-y-4 order-last lg:order-none">
             <div className="rounded-3xl border border-white/10 bg-slate-900/60 backdrop-blur-xl shadow-2xl p-8 text-center min-h-[300px] flex flex-col justify-center">
               {phase === "idle" && (
                 <div className="space-y-4">
@@ -708,7 +775,7 @@ export default function GamePage() {
                 <div className="space-y-6">
                   {/* Final Scores at the top */}
                   <div className="text-center space-y-4">
-                    <div className="text-3xl font-bold text-emerald-400">🎉 Game Complete! 🎉</div>
+                    <div className="text-3xl font-bold text-emerald-400">Game Complete!</div>
                     
                     <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                       <div className="bg-indigo-600/20 rounded-xl p-4 border border-indigo-500/30">
@@ -842,7 +909,7 @@ export default function GamePage() {
             </div>
           </div>
 
-          <div className="hidden lg:block lg:col-span-3 xl:col-span-2">
+          <div className="hidden lg:block lg:col-span-3 xl:col-span-3 2xl:col-span-3">
             <TeamCard side="Red" color="red" score={redScore} players={redTeam} currentPlayerId={currentPlayer?.id} />
           </div>
         </div>

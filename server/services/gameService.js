@@ -4,10 +4,13 @@ import { Round } from '../models/Round.js';
 import jwt from 'jsonwebtoken';
 import QuestionService from './questionService.js';
 import { lobbyStore, getLobbySnapshot } from './lobbyService.js';
-import { emitGameStarted, emitRoundStarted, emitRoundResults, emitCustomEventToLobby } from '../socket/socketService.js';
+import { emitGameStarted, emitRoundStarted, emitRoundResults, emitCustomEventToLobby, emitRoundTimeup } from '../socket/socketService.js';
 import AnswerCheckService from './answercheckService.js';
 
 const answerCheckService = new AnswerCheckService();
+
+// Track active round timers (lobbyCode -> timeout)
+const roundTimers = new Map();
 
 export const startGame = async (lobby) => {
     try {
@@ -99,6 +102,18 @@ export const startRound = (playerId, code) => {
     const durationMs = (Number(roundLimit) || 30) * 1000; 
     const endsAt = serverNow + durationMs;
 
+    // Clear any existing timer for this lobby
+    if (roundTimers.has(code)) {
+        clearTimeout(roundTimers.get(code));
+    }
+
+    // Set up timer to automatically end round when time expires
+    const timer = setTimeout(() => {
+        handleRoundTimeout(code);
+    }, durationMs);
+    
+    roundTimers.set(code, timer);
+
     const snapshot = getGameStateSnapshot(lobby);
     emitRoundStarted(code, { game: snapshot, serverNow, endsAt, durationMs });
     
@@ -174,7 +189,11 @@ export const submitAnswer = async (playerId, code, isSteal, answer, team, roundN
         
         // If both teams have submitted, process answers asynchronously
         if (lobby.gameState.currentRound.bothSubmitted()) {
-
+            // Clear the round timer since both teams submitted
+            if (roundTimers.has(code)) {
+                clearTimeout(roundTimers.get(code));
+                roundTimers.delete(code);
+            }
             
             // Emit that processing has started
             emitCustomEventToLobby(code, 'answer-processing-started', {
@@ -195,6 +214,49 @@ export const submitAnswer = async (playerId, code, isSteal, answer, team, roundN
     return { success: true, message: 'Answer submitted successfully' };
 }
 
+const handleRoundTimeout = async (code) => {
+    try {
+        const lobby = lobbyStore.get(code);
+        if (!lobby || !lobby.gameState.currentRound) {
+            return;
+        }
+
+        const currentRound = lobby.gameState.currentRound;
+        
+        // Check which teams haven't submitted yet and submit blank answers for them
+        if (!currentRound.blueSubmitted) {
+            currentRound.setTeamAnswer('blue', false, ''); // Empty answer
+            console.log(`Auto-submitted blank answer for blue team in lobby ${code}`);
+        }
+        
+        if (!currentRound.redSubmitted) {
+            currentRound.setTeamAnswer('red', false, ''); // Empty answer
+            console.log(`Auto-submitted blank answer for red team in lobby ${code}`);
+        }
+
+        // Clear the timer
+        roundTimers.delete(code);
+        
+        // Emit round timeup event to clients
+        emitRoundTimeup(code, {
+            message: 'Time\'s up! Processing results...',
+            endsAt: Date.now()
+        });
+
+        // Emit that processing has started
+        emitCustomEventToLobby(code, 'answer-processing-started', {
+            message: 'Time\'s up! Checking answers...',
+            timestamp: new Date().toISOString()
+        });
+        
+        // Process the round results with submitted and blank answers
+        await processRoundResults(lobby, code);
+        
+    } catch (error) {
+        console.error('Error handling round timeout:', error);
+    }
+};
+
 const processRoundResults = async (lobby, code) => {
     try {
 
@@ -212,6 +274,12 @@ const processRoundResults = async (lobby, code) => {
         if (isGameEnd) {
             // This was the final round - emit game end results
             lobby.gamePhase = 'ended';
+            
+            // Clear any remaining timer for this lobby
+            if (roundTimers.has(code)) {
+                clearTimeout(roundTimers.get(code));
+                roundTimers.delete(code);
+            }
             
             emitRoundResults(code, {
                 round: lobby.gameState.currentRound,
@@ -377,12 +445,20 @@ export const returnToLobby = (playerId, code) => {
     return { success: true, lobby: finalSnapshot };
 };
 
-const getGameStateSnapshot = (lobby) => {
+export const getGameStateSnapshot = (lobby) => {
     return {
         currentRoundNumber: lobby.gameState.currentRoundNumber,
         currentRound: lobby.gameState.currentRound,
         scores: lobby.gameState.scores,
         gamePhase: lobby.gamePhase,
         rounds: lobby.gameState.rounds,
-    }    
-}
+    };
+};
+
+export const cleanupLobbyTimers = (code) => {
+    if (roundTimers.has(code)) {
+        clearTimeout(roundTimers.get(code));
+        roundTimers.delete(code);
+        console.log(`Cleaned up timer for lobby ${code}`);
+    }
+};

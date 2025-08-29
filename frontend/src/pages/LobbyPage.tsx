@@ -11,6 +11,17 @@ import { Crown, Trash2, Plus, X } from "lucide-react"
 import { socketService, addSocketListener, removeSocketListener } from "@/lib/socket"
 import { getBaseUrl } from "@/lib/api"
 
+function GameIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden>
+      <circle cx="16" cy="16" r="15" fill="#1f2937" stroke="#374151" strokeWidth="2"/>
+      <rect x="8" y="10" width="8" height="12" rx="1" fill="#3b82f6" stroke="#1e40af" strokeWidth="1"/>
+      <rect x="16" y="10" width="8" height="12" rx="1" fill="#ef4444" stroke="#dc2626" strokeWidth="1"/>
+      <text x="16" y="20" textAnchor="middle" fill="white" fontFamily="Arial, sans-serif" fontSize="10" fontWeight="bold">?</text>
+    </svg>
+  )
+}
+
 interface Player {
   id: string
   name: string
@@ -440,8 +451,11 @@ export default function LobbyPage() {
       <div className="max-w-7xl mx-auto relative">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-white tracking-wide mb-2">Game Of Liars</h1>
-          <div className="text-2xl font-mono text-slate-300 bg-slate-800/50 inline-block px-4 py-2 rounded-lg border border-slate-600">
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <GameIcon className="h-14 w-14" />
+            <h1 className="text-5xl font-semibold text-white tracking-wide">Game of Liars</h1>
+          </div>
+          <div className="text-2xl font-mono text-slate-300 bg-slate-800/50 inline-block px-6 py-3 rounded-lg border border-slate-600">
             CODE: {gameCode}
           </div>
         </div>

@@ -176,6 +176,19 @@ export const emitRoundResults = (lobbyCode, payload) => {
 };
 
 /**
+ * Emit when a round times out
+ * @param {string} lobbyCode
+ * @param {Object} payload - Timeout information
+ */
+export const emitRoundTimeup = (lobbyCode, payload) => {
+    emitToLobby(lobbyCode, 'round-timeup', {
+        lobbyCode,
+        ...payload,
+        timestamp: new Date().toISOString()
+    });
+};
+
+/**
  * Emit a you were kicked event to a specific player
  * @param {string} playerId - Player ID
  * @param {string} reason - Reason for being kicked

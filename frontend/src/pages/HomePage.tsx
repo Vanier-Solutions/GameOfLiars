@@ -10,22 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getBaseUrl } from "@/lib/api"
 
-function BanditLogo({ className }: { className?: string }) {
+function GameIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden>
-      <defs>
-        <linearGradient id="g" x1="0" x2="1">
-          <stop offset="0%" stopColor="#60a5fa" />
-          <stop offset="100%" stopColor="#34d399" />
-        </linearGradient>
-      </defs>
-      <circle cx="32" cy="32" r="30" fill="url(#g)" opacity="0.15" />
-      <circle cx="32" cy="28" r="14" fill="#0f172a" stroke="#cbd5e1" strokeOpacity=".2" />
-      <rect x="16" y="24" width="32" height="8" rx="4" fill="#1f2937" stroke="#cbd5e1" strokeOpacity=".25" />
-      <circle cx="26" cy="28" r="2.5" fill="#e5e7eb" />
-      <circle cx="38" cy="28" r="2.5" fill="#e5e7eb" />
-      <path d="M22 40c6 4 14 4 20 0" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
-      <path d="M20 18c4-4 20-4 24 0" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+    <svg viewBox="0 0 32 32" className={className} aria-hidden>
+      <circle cx="16" cy="16" r="15" fill="#1f2937" stroke="#374151" strokeWidth="2"/>
+      <rect x="8" y="10" width="8" height="12" rx="1" fill="#3b82f6" stroke="#1e40af" strokeWidth="1"/>
+      <rect x="16" y="10" width="8" height="12" rx="1" fill="#ef4444" stroke="#dc2626" strokeWidth="1"/>
+      <text x="16" y="20" textAnchor="middle" fill="white" fontFamily="Arial, sans-serif" fontSize="10" fontWeight="bold">?</text>
     </svg>
   )
 }
@@ -231,12 +222,11 @@ export default function HomePage() {
       </Dialog>
 
       <div className="mx-auto max-w-7xl px-4 pb-12 pt-6 relative">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex items-center justify-center">
           <div className="flex items-center gap-3">
-            <BanditLogo className="h-8 w-8" />
-            <span className="text-xl font-semibold tracking-wide text-white">Game of Liars</span>
+            <GameIcon className="h-10 w-10" />
+            <span className="text-2xl font-semibold tracking-wide text-white">Game of Liars</span>
           </div>
-          <div className="text-sm text-slate-300/80">v0.2 • VS Devs </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
