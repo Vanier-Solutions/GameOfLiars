@@ -22,7 +22,8 @@ const getAllowedOrigins = () => {
             'http://localhost:5173',
             'http://localhost:5050',
             'http://127.0.0.1:5173',
-            'http://127.0.0.1:5050'
+            'http://127.0.0.1:5050',
+            'http://172.16.95.42:5173',
         );
     }
     
