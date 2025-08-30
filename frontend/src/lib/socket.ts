@@ -63,7 +63,7 @@ class SocketService {
       return this.socket;
     }
 
-    const serverUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5051';
+    const serverUrl = import.meta.env.VITE_API_BASE_URL || 'https://gameofliars.com';
     
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],

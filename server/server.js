@@ -28,18 +28,13 @@ const getAllowedOrigins = () => {
         );
     }
     
-    // Production Vercel frontend URLs
+    // Production frontend URLs
     if (process.env.FRONTEND_URL) {
         origins.push(process.env.FRONTEND_URL);
     }
     
-    // Vercel preview deployments (format: https://your-app-*.vercel.app)
-    if (process.env.VERCEL_PREVIEW_DOMAIN) {
-        origins.push(`https://${process.env.VERCEL_PREVIEW_DOMAIN}`);
-    }
-    
-    // Add your actual Vercel domain here (replace with your app name)
-    const vercelDomain = process.env.VERCEL_DOMAIN || 'your-game-app.vercel.app';
+    // Add your actual domain here
+    const vercelDomain = process.env.VERCEL_DOMAIN || 'gameofliars.com';
     origins.push(`https://${vercelDomain}`);
     
     return origins;
