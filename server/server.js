@@ -34,7 +34,7 @@ const getAllowedOrigins = () => {
     }
     
     // Add your actual domain here
-    const vercelDomain = process.env.VERCEL_DOMAIN || 'gameofliars.com';
+    const vercelDomain = process.env.VERCEL_DOMAIN || 'https://gameofliars.com';
     origins.push(`https://${vercelDomain}`);
     
     return origins;
