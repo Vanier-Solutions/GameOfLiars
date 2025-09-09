@@ -4,12 +4,13 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "echo 'No build step required'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "GOL Backend Server",
   "type": "module",
   "dependencies": {
     "@google/genai": "^1.15.0",
