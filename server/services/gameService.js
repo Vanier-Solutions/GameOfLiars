@@ -3,6 +3,7 @@ import { Player } from '../models/Player.js';
 import { Round } from '../models/Round.js';
 import jwt from 'jsonwebtoken';
 import QuestionService from './questionService.js';
+import GameResult from '../models/GameResult.js';
 import { lobbyStore, getLobbySnapshot } from './lobbyService.js';
 import { emitGameStarted, emitRoundStarted, emitRoundResults, emitCustomEventToLobby, emitRoundTimeup } from '../socket/socketService.js';
 import AnswerCheckService from './answercheckService.js';
@@ -23,6 +24,8 @@ export const startGame = async (lobby) => {
             blue: 0,
             red: 0,
         };
+        lobby.gameState.startedAt = new Date();
+        lobby.gameState.endedAt = null;
 
         const snapshot = getLobbySnapshot(lobby);
         emitGameStarted(lobby.code, { lobby: snapshot });
@@ -274,6 +277,7 @@ const processRoundResults = async (lobby, code) => {
         if (isGameEnd) {
             // This was the final round - emit game end results
             lobby.gamePhase = 'ended';
+            lobby.gameState.endedAt = new Date();
             
             // Clear any remaining timer for this lobby
             if (roundTimers.has(code)) {
@@ -281,6 +285,11 @@ const processRoundResults = async (lobby, code) => {
                 roundTimers.delete(code);
             }
             
+            // Persist game results (fire-and-forget)
+            saveGameResult(lobby).catch(err => {
+                console.error('Failed to save game result:', err);
+            });
+
             emitRoundResults(code, {
                 round: lobby.gameState.currentRound,
                 scores: lobby.gameState.scores,
@@ -316,6 +325,51 @@ const processRoundResults = async (lobby, code) => {
         });
     }
 };
+
+const saveGameResult = async (lobby) => {
+    try {
+        const blueTeam = lobby.getBlueTeam().map(p => ({ name: p.name, isCaptain: p.isCaptain }));
+        const redTeam = lobby.getRedTeam().map(p => ({ name: p.name, isCaptain: p.isCaptain }));
+        const settings = lobby.getSettings();
+
+        const rounds = (lobby.gameState.rounds || []).map(r => ({
+            roundNumber: r.roundNumber,
+            question: r.question,
+            tag: r.tag,
+            blueAnswer: r.blueAnswer,
+            redAnswer: r.redAnswer,
+            blueSteal: r.blueSteal,
+            redSteal: r.redSteal,
+            winner: r.winner,
+            bluePointsGained: r.bluePointsGained,
+            redPointsGained: r.redPointsGained,
+        }));
+
+        const totalBlue = lobby.gameState.scores?.blue ?? 0;
+        const totalRed = lobby.gameState.scores?.red ?? 0;
+        const winner = totalBlue === totalRed ? 'tie' : (totalBlue > totalRed ? 'blue' : 'red');
+
+        const doc = new GameResult({
+            lobbyCode: lobby.getCode(),
+            startedAt: lobby.gameState.startedAt || new Date(),
+            endedAt: lobby.gameState.endedAt || new Date(),
+            settings: {
+                rounds: Number(settings.rounds) || rounds.length,
+                roundLimit: Number(settings.roundLimit) || 0,
+                tags: Array.isArray(settings.tags) ? settings.tags : [],
+            },
+            scores: { blue: totalBlue, red: totalRed },
+            winner,
+            blueTeam,
+            redTeam,
+            rounds,
+        });
+
+        await doc.save();
+    } catch (err) {
+        console.error('Error saving game result:', err);
+    }
+}
 
 const checkAnswers = async (lobby) => {
     const round = lobby.gameState.currentRound;
