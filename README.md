@@ -3,6 +3,7 @@
 https://gameofliars.com/
 
 Fast-paced team trivia battles • Real-time • AI-powered questions
+
 Tech Stack
 ----------
 - Frontend: React + TypeScript (Vite), Tailwind CSS, shadcn/ui, socket.io‑client
