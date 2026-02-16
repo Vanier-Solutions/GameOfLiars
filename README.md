@@ -1,5 +1,5 @@
-Game Of Liars
-──────────────
+**Game Of Liars**
+----------
 https://gameofliars.com/
 
 Fast-paced team trivia battles • Real-time • AI-powered questions
